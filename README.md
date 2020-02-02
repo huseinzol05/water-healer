@@ -59,6 +59,9 @@ During `poll`,
 
 ```python
 
+# start python script,
+# `group` offset: 0
+
 # every successful `poll`, it will automatically update the offset.
 
 # first polling,
@@ -73,7 +76,7 @@ During `poll`,
 # `group` offset: 3
 # kafka -> 3 -> plus_one(3) -> exception, halt
 
-# fourth polling,
+# fourth polling, restart python script,
 # `group` offset: 4
 # kafka -> 4 -> plus_one(4) -> exception, halt
 ```
