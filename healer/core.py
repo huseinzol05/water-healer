@@ -81,6 +81,10 @@ class from_kafka(Source):
         if not healer or not ignore_error:
             raise Exception('need to be True for healer or ignore_error')
         self.cpars = consumer_params
+
+        if healer:
+            self.cpars['enable.auto.commit'] = False
+
         self.consumer = None
         self.topics = topics
         self.poll_interval = poll_interval

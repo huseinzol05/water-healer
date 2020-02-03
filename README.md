@@ -4,6 +4,8 @@
     </a>
 </p>
 
+---
+
 **water-healer**, Extension of Kafka Streamz to update consumer offset for every successful sink.
 
 This library is an extension for Streamz library to provide `healing` offset for kafka topics.
