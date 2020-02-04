@@ -31,6 +31,58 @@ THE POSSIBILITY OF SUCH DAMAGE.
 
 from tornado import gen
 from streamz.core import Stream, convert_interval
+import confluent_kafka as ck
+import uuid
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def healing(stream, row, ignore = False, silent = False):
+    if row[0] not in stream.memory:
+        msg = 'message id not in stream memory'
+        if ignore:
+            logger.warning(msg)
+
+            return {'id': row[0], 'success': False}
+        else:
+            logger.exception(msg)
+            raise
+
+    c = stream.memory(row[0])
+    low_offset, high_offset = stream.consumer.get_watermark_offsets(
+        ck.TopicPartition(c['topic'], c['partition'])
+    )
+    current_offset = stream.consumer.committed(
+        [ck.TopicPartition(c['topic'], c['partition'])]
+    )[0].offset
+    success = False
+    if current_partition >= high_offset:
+        if not silent:
+            print('current offset already same as high offset, skip')
+    elif c['offset'] < current_offset:
+        if not silent:
+            print('current offset higher than message offset, skip')
+    else:
+        try:
+            stream.consumer.commit(
+                offsets = [
+                    ck.TopicPartition(
+                        c['topic'], c['partition'], c['offset'] + 1
+                    )
+                ],
+                asynchronous = False,
+            )
+            success = True
+        except Exception as e:
+            if ignore:
+                logging.warning(str(e))
+            else:
+                logger.exception(e)
+                raise
+
+        stream.memory.pop(row[0], None)
+    return {'id': row[0], 'success': success}
 
 
 @Stream.register_api(staticmethod)
@@ -92,3 +144,55 @@ class from_kafka(Source):
         self.stopped = True
         if start:
             self.start()
+        self.memory = {}
+
+    def do_poll(self):
+        if self.consumer is not None:
+            msg = self.consumer.poll(0)
+            if msg and msg.value() and msg.error() is None:
+                return msg
+
+    @gen.coroutine
+    def poll_kafka(self):
+        while True:
+            val = self.do_poll()
+            if val:
+                if healer:
+                    uuid1 = str(uuid.uuid1())
+                    partition = val.partition()
+                    offset = val.offset()
+                    topic = val.topic()
+                    val = val.value()
+                    self.memory[uuid] = {
+                        'partition': partition,
+                        'offset': offset,
+                        'topic': topic,
+                    }
+                    yield self._emit((uuid, val))
+                else:
+                    yield self._emit(val.value())
+            else:
+                yield gen.sleep(self.poll_interval)
+            if self.stopped:
+                break
+        self._close_consumer()
+
+    def start(self):
+
+        if self.stopped:
+            self.stopped = False
+            self.consumer = ck.Consumer(self.cpars)
+            self.consumer.subscribe(self.topics)
+            tp = ck.TopicPartition(self.topics[0], 0, 0)
+
+            # blocks for consumer thread to come up
+            self.consumer.get_watermark_offsets(tp)
+            self.loop.add_callback(self.poll_kafka)
+
+    def _close_consumer(self):
+        if self.consumer is not None:
+            consumer = self.consumer
+            self.consumer = None
+            consumer.unsubscribe()
+            consumer.close()
+        self.stopped = True
