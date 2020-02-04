@@ -109,7 +109,7 @@ source = wh.from_kafka(
     },
     healer = True)
 
-source.(wh.healing, stream = source, callback = print)
+source.map(wh.healing, stream = source, callback = print)
 ```
 
 ## examples
