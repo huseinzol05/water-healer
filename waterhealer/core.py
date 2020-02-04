@@ -54,6 +54,23 @@ class Source(Stream):
 def healing(
     row, stream = None, callback = None, ignore = False, silent = False
 ):
+    """
+
+    Parameters
+    ----------
+    row: tuple
+        (uuid, value)
+    stream: waterhealer object
+        waterhealer object to connect with kafka
+    callback: function
+        callback function after successful update
+    ignore: bool, (default=False)
+        if True, if uuid not in memory, it will not stop. 
+        This is useful when you do batch processing, you might delete some rows after did some unique operations.
+    silent: bool, (default=False)
+        if True, will not print any log in this function.
+
+    """
     if not stream:
         raise Exception('stream must not None')
 
@@ -112,9 +129,6 @@ def healing(
 @Stream.register_api(staticmethod)
 class from_kafka(Source):
     """
-    Accepts messages from Kafka, 2 modes,
-    1. healer enable, set offset based on successful sink.
-    2. ignore_error enable, if any error during streaming, just proceed next offset. Cannot use if use healer mode.
 
     Parameters
     ----------
@@ -133,10 +147,6 @@ class from_kafka(Source):
         Seconds that elapse between polling Kafka for new messages
     start: bool (False)
         Whether to start polling upon instantiation
-    healer: bool (True)
-        healer mode, if True, ignore_error should set to False
-    ignore_error: bool (False)
-        ignore mode,  if True, healer should set to False
 
     """
 
@@ -146,16 +156,8 @@ class from_kafka(Source):
         consumer_params,
         poll_interval = 0.1,
         start = False,
-        healer = True,
-        ignore_error = False,
         **kwargs
     ):
-        if healer and ignore_error:
-            raise Exception(
-                'healer and ignore_error cannot be True at the same time'
-            )
-        if not healer and not ignore_error:
-            raise Exception('need to be True for healer or ignore_error')
         self.cpars = consumer_params
 
         if healer:
@@ -182,20 +184,17 @@ class from_kafka(Source):
         while True:
             val = self.do_poll()
             if val:
-                if self.healer:
-                    uuid1 = str(uuid.uuid1())
-                    partition = val.partition()
-                    offset = val.offset()
-                    topic = val.topic()
-                    val = val.value()
-                    self.memory[uuid1] = {
-                        'partition': partition,
-                        'offset': offset,
-                        'topic': topic,
-                    }
-                    yield self._emit((uuid1, val))
-                else:
-                    yield self._emit(val.value())
+                uuid1 = str(uuid.uuid1())
+                partition = val.partition()
+                offset = val.offset()
+                topic = val.topic()
+                val = val.value()
+                self.memory[uuid1] = {
+                    'partition': partition,
+                    'offset': offset,
+                    'topic': topic,
+                }
+                yield self._emit((uuid1, val))
             else:
                 yield gen.sleep(self.poll_interval)
             if self.stopped:

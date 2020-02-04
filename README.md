@@ -114,4 +114,68 @@ source.map(wh.healing, stream = source, callback = print)
 
 ## examples
 
-For more complicated example, simply check notebooks in [example](example)
+For more complicated example, simply check notebooks in [example](example).
+
+## usage
+
+#### waterhealer.from_kafka
+
+```python
+class from_kafka(Source):
+    """
+
+    Parameters
+    ----------
+    topics: list of str
+        Labels of Kafka topics to consume from
+    consumer_params: dict
+        Settings to set up the stream, see
+        https://docs.confluent.io/current/clients/confluent-kafka-python/#configuration
+        https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
+        Examples:
+        bootstrap.servers, Connection string(s) (host:port) by which to reach
+        Kafka;
+        group.id, Identity of the consumer. If multiple sources share the same
+        group, each message will be passed to only one of them.
+    poll_interval: number
+        Seconds that elapse between polling Kafka for new messages
+    start: bool (False)
+        Whether to start polling upon instantiation
+
+    """
+```
+
+`waterhealer.from_kafka` always returned a tuple,
+
+```python
+(uuid, value)
+```
+
+If you want to use waterhealer, you need to make sure `uuid` from `from_kafka` succesfully transported until sinking, or else it cannot update the offset.
+
+**Output from `waterhealer.from_kafka` is different from any sources object from `streamz`, `streamz` only returned `value`, not tuple as `waterhealer.from_kafka`.**
+
+#### waterhealer.healing
+
+```python
+def healing(
+    row, stream = None, callback = None, ignore = False, silent = False
+):
+    """
+
+    Parameters
+    ----------
+    row: tuple
+        (uuid, value)
+    stream: waterhealer object
+        waterhealer object to connect with kafka
+    callback: function
+        callback function after successful update
+    ignore: bool, (default=False)
+        if True, if uuid not in memory, it will not stop. 
+        This is useful when you do batch processing, you might delete some rows after did some unique operations.
+    silent: bool, (default=False)
+        if True, will not print any log in this function.
+
+    """
+```
