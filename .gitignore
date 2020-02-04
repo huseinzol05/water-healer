@@ -1,0 +1,8 @@
+build
+dist
+water_healer.egg-info
+.ipynb_checkpoints
+healer/__pycache__
+*__pycache__
+*.DS_Store
+*Untitled*.ipynb

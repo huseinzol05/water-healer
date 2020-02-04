@@ -86,3 +86,32 @@ During `poll`,
 Consumer already updated the offset even though the streaming is failed.
 
 On fourth polling, we should pull back `offset` 2, not 3.
+
+## Installing from the PyPI
+
+```bash
+pip install water-healer
+```
+
+## how-to
+
+```python
+import waterhealer as wh
+import json
+
+# subscribe to `testing` topic
+source = wh.from_kafka(
+    ['testing'],
+    {
+        'bootstrap.servers': 'localhost:9092',
+        'group.id': 'group',
+        'auto.offset.reset': 'latest',
+    },
+    healer = True)
+
+source.(wh.healing, stream = source, callback = print)
+```
+
+## examples
+
+For more complicated example, simply check notebooks in [example](example)

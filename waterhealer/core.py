@@ -38,7 +38,25 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def healing(stream, row, ignore = False, silent = False):
+class Source(Stream):
+    _graphviz_shape = 'doubleoctagon'
+
+    def __init__(self, **kwargs):
+        self.stopped = True
+        super(Source, self).__init__(**kwargs)
+
+    def stop(self):  # pragma: no cover
+        # fallback stop method - for poll functions with while not self.stopped
+        if not self.stopped:
+            self.stopped = True
+
+
+def healing(
+    row, stream = None, callback = None, ignore = False, silent = False
+):
+    if not stream:
+        raise Exception('stream must not None')
+
     if row[0] not in stream.memory:
         msg = 'message id not in stream memory'
         if ignore:
@@ -46,23 +64,23 @@ def healing(stream, row, ignore = False, silent = False):
 
             return {'id': row[0], 'success': False}
         else:
-            logger.exception(msg)
-            raise
+            raise Exception(msg)
 
-    c = stream.memory(row[0])
+    c = stream.memory[row[0]]
     low_offset, high_offset = stream.consumer.get_watermark_offsets(
         ck.TopicPartition(c['topic'], c['partition'])
     )
     current_offset = stream.consumer.committed(
         [ck.TopicPartition(c['topic'], c['partition'])]
     )[0].offset
+
     success = False
-    if current_partition >= high_offset:
-        if not silent:
-            print('current offset already same as high offset, skip')
+    reason = 'committed %s %d' % (c['topic'], c['partition'])
+
+    if current_offset >= high_offset:
+        reason = 'current offset already same as high offset, skip'
     elif c['offset'] < current_offset:
-        if not silent:
-            print('current offset higher than message offset, skip')
+        reason = 'current offset higher than message offset, skip'
     else:
         try:
             stream.consumer.commit(
@@ -82,7 +100,13 @@ def healing(stream, row, ignore = False, silent = False):
                 raise
 
         stream.memory.pop(row[0], None)
-    return {'id': row[0], 'success': success}
+
+    if not silent:
+        logging.info(reason)
+
+    if callback:
+        callback(row[1])
+    return {'id': row[0], 'success': success, 'reason': reason}
 
 
 @Stream.register_api(staticmethod)
@@ -130,13 +154,14 @@ class from_kafka(Source):
             raise Exception(
                 'healer and ignore_error cannot be True at the same time'
             )
-        if not healer or not ignore_error:
+        if not healer and not ignore_error:
             raise Exception('need to be True for healer or ignore_error')
         self.cpars = consumer_params
 
         if healer:
             self.cpars['enable.auto.commit'] = False
 
+        self.healer = healer
         self.consumer = None
         self.topics = topics
         self.poll_interval = poll_interval
@@ -157,18 +182,18 @@ class from_kafka(Source):
         while True:
             val = self.do_poll()
             if val:
-                if healer:
+                if self.healer:
                     uuid1 = str(uuid.uuid1())
                     partition = val.partition()
                     offset = val.offset()
                     topic = val.topic()
                     val = val.value()
-                    self.memory[uuid] = {
+                    self.memory[uuid1] = {
                         'partition': partition,
                         'offset': offset,
                         'topic': topic,
                     }
-                    yield self._emit((uuid, val))
+                    yield self._emit((uuid1, val))
                 else:
                     yield self._emit(val.value())
             else:
