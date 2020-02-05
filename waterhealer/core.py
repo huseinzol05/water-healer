@@ -32,7 +32,6 @@ THE POSSIBILITY OF SUCH DAMAGE.
 from tornado import gen
 from streamz.core import Stream, convert_interval
 import confluent_kafka as ck
-import uuid
 import logging
 
 logger = logging.getLogger(__name__)
@@ -156,7 +155,7 @@ class from_kafka(Source):
         consumer_params,
         poll_interval = 0.1,
         start = False,
-        **kwargs
+        **kwargs,
     ):
         self.cpars = consumer_params
         self.cpars['enable.auto.commit'] = False
@@ -180,17 +179,17 @@ class from_kafka(Source):
         while True:
             val = self.do_poll()
             if val:
-                uuid1 = str(uuid.uuid1())
                 partition = val.partition()
                 offset = val.offset()
                 topic = val.topic()
                 val = val.value()
-                self.memory[uuid1] = {
+                id_val = f'{partition}-{offset}-{topic}'
+                self.memory[id_val] = {
                     'partition': partition,
                     'offset': offset,
                     'topic': topic,
                 }
-                yield self._emit((uuid1, val))
+                yield self._emit((id_val, val))
             else:
                 yield gen.sleep(self.poll_interval)
             if self.stopped:
