@@ -33,6 +33,7 @@ from tornado import gen
 from streamz.core import Stream, convert_interval
 import confluent_kafka as ck
 import logging
+from expiringdict import ExpiringDict
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +52,12 @@ class Source(Stream):
 
 
 def healing(
-    row, stream = None, callback = None, ignore = False, silent = False
+    row,
+    stream = None,
+    callback = None,
+    ignore = False,
+    silent = False,
+    **kwargs,
 ):
     """
 
@@ -68,16 +74,17 @@ def healing(
         This is useful when you do batch processing, you might delete some rows after did some unique operations.
     silent: bool, (default=False)
         if True, will not print any log in this function.
+    **kwargs:
+        Keyword arguments to pass to callback.
 
     """
     if not stream:
         raise Exception('stream must not None')
 
-    if row[0] not in stream.memory:
+    if not stream.memory.get(row[0]):
         msg = 'message id not in stream memory'
         if ignore:
             logger.warning(msg)
-
             return {'id': row[0], 'success': False}
         else:
             raise Exception(msg)
@@ -121,7 +128,7 @@ def healing(
         logging.info(reason)
 
     if callback:
-        callback(row[1])
+        callback(row[1], **kwargs)
     return {'id': row[0], 'success': success, 'reason': reason}
 
 
@@ -142,9 +149,13 @@ class from_kafka(Source):
         Kafka;
         group.id, Identity of the consumer. If multiple sources share the same
         group, each message will be passed to only one of them.
+    maxlen_memory: int, (100000)
+        max size of memory (dict). Oldest automatically delete.
+    maxage_memory: int, (1800)
+        max age for each values in memory (dict). This will auto delete if the value stay too long in the memory.
     poll_interval: number
         Seconds that elapse between polling Kafka for new messages
-    start: bool (False)
+    start: bool, (False)
         Whether to start polling upon instantiation
 
     """
@@ -153,6 +164,8 @@ class from_kafka(Source):
         self,
         topics,
         consumer_params,
+        maxlen_memory = 100_000,
+        maxage_memory = 1800,
         poll_interval = 0.1,
         start = False,
         **kwargs,
@@ -166,7 +179,9 @@ class from_kafka(Source):
         self.stopped = True
         if start:
             self.start()
-        self.memory = {}
+        self.memory = ExpiringDict(
+            max_len = maxlen_memory, max_age_seconds = maxage_memory
+        )
 
     def do_poll(self):
         if self.consumer is not None:
