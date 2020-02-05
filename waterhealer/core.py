@@ -159,11 +159,7 @@ class from_kafka(Source):
         **kwargs
     ):
         self.cpars = consumer_params
-
-        if healer:
-            self.cpars['enable.auto.commit'] = False
-
-        self.healer = healer
+        self.cpars['enable.auto.commit'] = False
         self.consumer = None
         self.topics = topics
         self.poll_interval = poll_interval
