@@ -137,9 +137,13 @@ class from_kafka(Source):
         Kafka;
         group.id, Identity of the consumer. If multiple sources share the same
         group, each message will be passed to only one of them.
+    maxlen_memory: int, (100000)
+        max size of memory (dict). Oldest automatically delete.
+    maxage_memory: int, (1800)
+        max age for each values in memory (dict). This will auto delete if the value stay too long in the memory.
     poll_interval: number
         Seconds that elapse between polling Kafka for new messages
-    start: bool (False)
+    start: bool, (False)
         Whether to start polling upon instantiation
 
     """
@@ -159,7 +163,12 @@ If you want to use waterhealer, you need to make sure `uuid` from `from_kafka` s
 
 ```python
 def healing(
-    row, stream = None, callback = None, ignore = False, silent = False
+    row,
+    stream = None,
+    callback = None,
+    ignore = False,
+    silent = False,
+    **kwargs,
 ):
     """
 
@@ -176,6 +185,8 @@ def healing(
         This is useful when you do batch processing, you might delete some rows after did some unique operations.
     silent: bool, (default=False)
         if True, will not print any log in this function.
+    **kwargs:
+        Keyword arguments to pass to callback.
 
     """
 ```
