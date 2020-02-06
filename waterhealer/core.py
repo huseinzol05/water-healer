@@ -98,7 +98,11 @@ def healing(
     )[0].offset
 
     success = False
-    reason = 'committed %s %d' % (c['topic'], c['partition'])
+    reason = 'committed topic: %s partition: %d offset: %d' % (
+        c['topic'],
+        c['partition'],
+        c['offset'],
+    )
 
     if current_offset >= high_offset:
         reason = 'current offset already same as high offset, skip'
