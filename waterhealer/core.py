@@ -125,7 +125,7 @@ def healing(
         stream.memory.pop(row[0], None)
 
     if not silent:
-        logging.info(reason)
+        logger.warning(reason)
 
     if callback:
         callback(row[1], **kwargs)
