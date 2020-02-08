@@ -57,6 +57,7 @@ def healing(
     callback = None,
     ignore = False,
     silent = False,
+    asynchronous = False,
     **kwargs,
 ):
     """
@@ -74,6 +75,8 @@ def healing(
         This is useful when you do batch processing, you might delete some rows after did some unique operations.
     silent: bool, (default=False)
         if True, will not print any log in this function.
+    asynchronous: bool, (default=False)
+        if True, it will update kafka offset async manner.
     **kwargs:
         Keyword arguments to pass to callback.
 
@@ -116,7 +119,7 @@ def healing(
                         c['topic'], c['partition'], c['offset'] + 1
                     )
                 ],
-                asynchronous = False,
+                asynchronous = asynchronous,
             )
             success = True
         except Exception as e:
@@ -153,13 +156,13 @@ class from_kafka(Source):
         Kafka;
         group.id, Identity of the consumer. If multiple sources share the same
         group, each message will be passed to only one of them.
-    maxlen_memory: int, (100000)
+    maxlen_memory: int, (default=100000)
         max size of memory (dict). Oldest automatically delete.
-    maxage_memory: int, (1800)
+    maxage_memory: int, (default=1800)
         max age for each values in memory (dict). This will auto delete if the value stay too long in the memory.
     poll_interval: number
         Seconds that elapse between polling Kafka for new messages
-    start: bool, (False)
+    start: bool, (default=False)
         Whether to start polling upon instantiation
 
     """
