@@ -193,3 +193,25 @@ def healing(
 
     """
 ```
+
+#### partition_time
+
+```python
+class partition_time(Stream):
+    """ Partition stream into tuples if waiting time expired.
+
+    Examples
+    --------
+    >>> source = Stream()
+    >>> source.partition_time(3).sink(print)
+    >>> for i in range(10):
+    ...     source.emit(i)
+    (0, 1, 2)
+    (3, 4, 5)
+    (6, 7, 8)
+    """
+```
+
+This is different from [partition](https://streamz.readthedocs.io/en/latest/api.html#streamz.partition).
+
+`partition` only proceed to next flow if size is equal to `n`. But for `partition_time`, if waiting time is expired, it will proceed, does not care about the size, and expired time only calculated with an element came in.
