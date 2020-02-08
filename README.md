@@ -168,6 +168,7 @@ def healing(
     callback = None,
     ignore = False,
     silent = False,
+    asynchronous = False,
     **kwargs,
 ):
     """
@@ -185,6 +186,8 @@ def healing(
         This is useful when you do batch processing, you might delete some rows after did some unique operations.
     silent: bool, (default=False)
         if True, will not print any log in this function.
+    asynchronous: bool, (default=False)
+        if True, it will update kafka offset async manner.
     **kwargs:
         Keyword arguments to pass to callback.
 
