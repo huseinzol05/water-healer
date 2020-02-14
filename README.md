@@ -163,12 +163,12 @@ If you want to use waterhealer, you need to make sure `uuid` from `from_kafka` s
 
 ```python
 def healing(
-    row,
-    stream = None,
-    callback = None,
-    ignore = False,
-    silent = False,
-    asynchronous = False,
+    row: Tuple,
+    stream: Callable = None,
+    callback: Callable = None,
+    ignore: bool = False,
+    silent: bool = False,
+    asynchronous: bool = False,
     **kwargs,
 ):
     """
@@ -193,6 +193,60 @@ def healing(
 
     """
 ```
+
+Partial code can be like this,
+
+```python
+.map(function).sink(healing)
+```
+
+Example, [simple-plus-element.ipynb](example/simple-plus-element.ipynb)
+
+#### waterhealer.healing_batch
+
+Instead we do it one-by-one, we can do concurrent updates async manner.
+
+```python
+def healing_batch(
+    rows: Tuple[Tuple],
+    stream: Callable = None,
+    callback: Callable = None,
+    ignore: bool = False,
+    silent: bool = False,
+    asynchronous: bool = False,
+    **kwargs,
+):
+    """
+
+    Parameters
+    ----------
+    row: tuple of tuple
+        ((uuid, value),)
+    stream: waterhealer object
+        waterhealer object to connect with kafka
+    callback: function
+        callback function after successful update
+    ignore: bool, (default=False)
+        if True, if uuid not in memory, it will not stop. 
+        This is useful when you do batch processing, you might delete some rows after did some unique operations.
+    silent: bool, (default=False)
+        if True, will not print any log in this function.
+    asynchronous: bool, (default=False)
+        if True, it will update kafka offset async manner.
+    **kwargs:
+        Keyword arguments to pass to callback.
+
+    """
+```
+
+Partial code can be like this,
+
+```python
+.map(function).partition(5).sink(healing_batch)
+```
+
+Example, [simple-plus-batch.ipynb](example/simple-plus-batch.ipynb)
+
 
 #### partition_time
 

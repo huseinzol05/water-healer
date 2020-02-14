@@ -35,6 +35,8 @@ import confluent_kafka as ck
 import logging
 from expiringdict import ExpiringDict
 from datetime import datetime, timedelta
+import asyncio
+from typing import Tuple, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -52,36 +54,8 @@ class Source(Stream):
             self.stopped = True
 
 
-def healing(
-    row,
-    stream = None,
-    callback = None,
-    ignore = False,
-    silent = False,
-    asynchronous = False,
-    **kwargs,
-):
-    """
-
-    Parameters
-    ----------
-    row: tuple
-        (uuid, value)
-    stream: waterhealer object
-        waterhealer object to connect with kafka
-    callback: function
-        callback function after successful update
-    ignore: bool, (default=False)
-        if True, if uuid not in memory, it will not stop. 
-        This is useful when you do batch processing, you might delete some rows after did some unique operations.
-    silent: bool, (default=False)
-        if True, will not print any log in this function.
-    asynchronous: bool, (default=False)
-        if True, it will update kafka offset async manner.
-    **kwargs:
-        Keyword arguments to pass to callback.
-
-    """
+@gen.coroutine
+def _healing(row, stream, callback, ignore, silent, asynchronous, **kwargs):
     if not stream:
         raise Exception('stream must not None')
 
@@ -138,6 +112,100 @@ def healing(
     if callback:
         callback(row[1], **kwargs)
     return {'id': row[0], 'success': success, 'reason': reason}
+
+
+def healing(
+    row: Tuple,
+    stream: Callable = None,
+    callback: Callable = None,
+    ignore: bool = False,
+    silent: bool = False,
+    asynchronous: bool = False,
+    **kwargs,
+):
+    """
+
+    Parameters
+    ----------
+    row: tuple
+        (uuid, value)
+    stream: waterhealer object
+        waterhealer object to connect with kafka
+    callback: function
+        callback function after successful update
+    ignore: bool, (default=False)
+        if True, if uuid not in memory, it will not stop. 
+        This is useful when you do batch processing, you might delete some rows after did some unique operations.
+    silent: bool, (default=False)
+        if True, will not print any log in this function.
+    asynchronous: bool, (default=False)
+        if True, it will update kafka offset async manner.
+    **kwargs:
+        Keyword arguments to pass to callback.
+
+    """
+    result = _healing(
+        row = row,
+        stream = stream,
+        callback = callback,
+        ignore = ignore,
+        silent = silent,
+        asynchronous = asynchronous,
+        **kwargs,
+    )
+    return result.result()
+
+
+def healing_batch(
+    rows: Tuple[Tuple],
+    stream: Callable = None,
+    callback: Callable = None,
+    ignore: bool = False,
+    silent: bool = False,
+    asynchronous: bool = False,
+    **kwargs,
+):
+    """
+
+    Parameters
+    ----------
+    row: tuple of tuple
+        ((uuid, value),)
+    stream: waterhealer object
+        waterhealer object to connect with kafka
+    callback: function
+        callback function after successful update
+    ignore: bool, (default=False)
+        if True, if uuid not in memory, it will not stop. 
+        This is useful when you do batch processing, you might delete some rows after did some unique operations.
+    silent: bool, (default=False)
+        if True, will not print any log in this function.
+    asynchronous: bool, (default=False)
+        if True, it will update kafka offset async manner.
+    **kwargs:
+        Keyword arguments to pass to callback.
+
+    """
+
+    @gen.coroutine
+    def loop():
+        r = yield [
+            _healing(
+                row = row,
+                stream = stream,
+                callback = callback,
+                ignore = ignore,
+                silent = silent,
+                asynchronous = asynchronous,
+                **kwargs,
+            )
+            for row in rows
+        ]
+        return r
+
+    result = loop()
+
+    return result.result()
 
 
 @Stream.register_api(staticmethod)
