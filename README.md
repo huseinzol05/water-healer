@@ -268,4 +268,4 @@ class partition_time(Stream):
 
 This is different from [partition](https://streamz.readthedocs.io/en/latest/api.html#streamz.partition).
 
-`partition` only proceed to next flow if size is equal to `n`. But for `partition_time`, if waiting time is expired, it will proceed, does not care about the size, and expired time only calculated with an element came in.
+`partition` only proceed to next flow if size is equal to `n`. But for `partition_time`, if waiting time is expired, it will proceed, does not care about the size, and expired time only calculated when an element came in.
