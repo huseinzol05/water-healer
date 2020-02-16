@@ -225,7 +225,7 @@ def healing_batch(
     stream: waterhealer object
         waterhealer object to connect with kafka
     callback: function
-        callback function after successful update
+        callback function after successful update, apply for each element.
     ignore: bool, (default=False)
         if True, if uuid not in memory, it will not stop. 
         This is useful when you do batch processing, you might delete some rows after did some unique operations.
