@@ -31,97 +31,80 @@ THE POSSIBILITY OF SUCH DAMAGE.
 
 from tornado import gen
 from streamz.core import Stream, convert_interval
-import confluent_kafka as ck
-import logging
-from expiringdict import ExpiringDict
+from streamz.sources import Source
 from datetime import datetime, timedelta
+from itertools import cycle
+import confluent_kafka as ck
+import streamz
+import logging
 import asyncio
-from typing import Tuple, Callable
+from typing import Tuple, Callable, Dict
+import time
+
 
 logger = logging.getLogger(__name__)
 
 
-class Source(Stream):
-    _graphviz_shape = 'doubleoctagon'
-
-    def __init__(self, **kwargs):
-        self.stopped = True
-        super(Source, self).__init__(**kwargs)
-
-    def stop(self):  # pragma: no cover
-        # fallback stop method - for poll functions with while not self.stopped
-        if not self.stopped:
-            self.stopped = True
-
-
 @gen.coroutine
-def _healing(row, stream, callback, ignore, silent, asynchronous, **kwargs):
-    if not stream:
-        raise Exception('stream must not None')
-
-    if not stream.memory.get(row[0]):
-        msg = 'message id not in stream memory'
-        if ignore:
-            logger.warning(msg)
-            return {'id': row[0], 'success': False}
-        else:
-            raise Exception(msg)
-
-    c = stream.memory[row[0]]
-    low_offset, high_offset = stream.consumer.get_watermark_offsets(
-        ck.TopicPartition(c['topic'], c['partition'])
-    )
-    current_offset = stream.consumer.committed(
-        [ck.TopicPartition(c['topic'], c['partition'])]
-    )[0].offset
-
+def _healing(row, consumer, ignore, asynchronous):
+    if not consumer:
+        raise Exception('consumer must not None')
     success = False
-    reason = 'committed topic: %s partition: %d offset: %d' % (
-        c['topic'],
-        c['partition'],
-        c['offset'],
-    )
-
-    if current_offset >= high_offset:
-        reason = 'current offset already same as high offset, skip'
-    elif c['offset'] < current_offset:
-        reason = 'current offset higher than message offset, skip'
+    splitted = row[0].split('<!>')
+    if len(splitted) != 3:
+        reason = 'invalid uuid'
+        partition = None
+        offset = None
+        topic = None
     else:
-        try:
-            stream.consumer.commit(
-                offsets = [
-                    ck.TopicPartition(
-                        c['topic'], c['partition'], c['offset'] + 1
-                    )
-                ],
-                asynchronous = asynchronous,
-            )
-            success = True
-        except Exception as e:
-            if ignore:
-                logging.warning(str(e))
-            else:
-                logger.exception(e)
-                raise
+        partition, offset, topic = splitted
+        offset = int(offset)
+        partition = int(partition)
+        low_offset, high_offset = consumer.get_watermark_offsets(
+            ck.TopicPartition(topic, partition)
+        )
+        current_offset = consumer.committed(
+            [ck.TopicPartition(topic, partition)]
+        )[0].offset
 
-        stream.memory.pop(row[0], None)
+        reason = (
+            f'committed topic: {topic} partition: {partition} offset: {offset}'
+        )
 
-    if not silent:
-        logger.warning(reason)
+        if current_offset >= high_offset:
+            reason = 'current offset already same as high offset, skip'
+        elif offset < current_offset:
+            reason = 'current offset higher than message offset, skip'
+        else:
+            try:
+                consumer.commit(
+                    offsets = [ck.TopicPartition(topic, partition, offset + 1)],
+                    asynchronous = asynchronous,
+                )
+                success = True
+            except Exception as e:
+                if ignore:
+                    logging.warning(str(e))
+                    reason = str(e)
+                else:
+                    logger.exception(e)
+                    raise
 
-    if callback:
-        callback(row[1], **kwargs)
-    return {'id': row[0], 'success': success, 'reason': reason}
+    return {
+        'data': row[1],
+        'success': success,
+        'reason': reason,
+        'partition': partition,
+        'offset': offset,
+        'topic': topic,
+    }
 
 
 def healing(
     row: Tuple,
     stream: Callable = None,
-    callback: Callable = None,
     ignore: bool = False,
-    silent: bool = False,
     asynchronous: bool = False,
-    **kwargs,
 ):
     """
 
@@ -130,28 +113,21 @@ def healing(
     row: tuple
         (uuid, value)
     stream: waterhealer object
-        waterhealer object to connect with kafka
-    callback: function
-        callback function after successful update
+        waterhealer object to connect with kafka.
     ignore: bool, (default=False)
-        if True, if uuid not in memory, it will not stop. 
-        This is useful when you do batch processing, you might delete some rows after did some unique operations.
-    silent: bool, (default=False)
-        if True, will not print any log in this function.
+        if True, ignore any failed update offset.
     asynchronous: bool, (default=False)
         if True, it will update kafka offset async manner.
-    **kwargs:
-        Keyword arguments to pass to callback.
-
     """
+    if type(stream) == streamz.dask.starmap:
+        consumer = stream.upstreams[0].upstreams[0].consumer
+    else:
+        consumer = stream.consumer
     result = _healing(
         row = row,
-        stream = stream,
-        callback = callback,
+        consumer = consumer,
         ignore = ignore,
-        silent = silent,
         asynchronous = asynchronous,
-        **kwargs,
     )
     return result.result()
 
@@ -159,11 +135,8 @@ def healing(
 def healing_batch(
     rows: Tuple[Tuple],
     stream: Callable = None,
-    callback: Callable = None,
     ignore: bool = False,
-    silent: bool = False,
     asynchronous: bool = False,
-    **kwargs,
 ):
     """
 
@@ -173,31 +146,24 @@ def healing_batch(
         ((uuid, value),)
     stream: waterhealer object
         waterhealer object to connect with kafka
-    callback: function
-        callback function after successful update, apply for each element.
     ignore: bool, (default=False)
-        if True, if uuid not in memory, it will not stop. 
-        This is useful when you do batch processing, you might delete some rows after did some unique operations.
-    silent: bool, (default=False)
-        if True, will not print any log in this function.
+        if True, ignore any failed update offset.
     asynchronous: bool, (default=False)
         if True, it will update kafka offset async manner.
-    **kwargs:
-        Keyword arguments to pass to callback.
-
     """
+    if type(stream) == streamz.dask.starmap:
+        consumer = stream.upstreams[0].upstreams[0].consumer
+    else:
+        consumer = stream.consumer
 
     @gen.coroutine
     def loop():
         r = yield [
             _healing(
                 row = row,
-                stream = stream,
-                callback = callback,
+                consumer = consumer,
                 ignore = ignore,
-                silent = silent,
                 asynchronous = asynchronous,
-                **kwargs,
             )
             for row in rows
         ]
@@ -225,25 +191,21 @@ class from_kafka(Source):
         Kafka;
         group.id, Identity of the consumer. If multiple sources share the same
         group, each message will be passed to only one of them.
-    maxlen_memory: int, (default=100000)
-        max size of memory (dict). Oldest automatically delete.
-    maxage_memory: int, (default=1800)
-        max age for each values in memory (dict). This will auto delete if the value stay too long in the memory.
     poll_interval: number
         Seconds that elapse between polling Kafka for new messages
     start: bool, (default=False)
         Whether to start polling upon instantiation
-
+    debug: bool, (default=False)
+        If True, will print topic, partition and offset for each polled message.
     """
 
     def __init__(
         self,
         topics,
         consumer_params,
-        maxlen_memory = 100_000,
-        maxage_memory = 1800,
         poll_interval = 0.1,
         start = False,
+        debug = False,
         **kwargs,
     ):
         self.cpars = consumer_params
@@ -253,11 +215,10 @@ class from_kafka(Source):
         self.poll_interval = poll_interval
         super(from_kafka, self).__init__(ensure_io_loop = True, **kwargs)
         self.stopped = True
+        self.debug = debug
+
         if start:
             self.start()
-        self.memory = ExpiringDict(
-            max_len = maxlen_memory, max_age_seconds = maxage_memory
-        )
 
     def do_poll(self):
         if self.consumer is not None:
@@ -274,12 +235,11 @@ class from_kafka(Source):
                 offset = val.offset()
                 topic = val.topic()
                 val = val.value()
-                id_val = f'{partition}-{offset}-{topic}'
-                self.memory[id_val] = {
-                    'partition': partition,
-                    'offset': offset,
-                    'topic': topic,
-                }
+                id_val = f'{partition}<!>{offset}<!>{topic}'
+                if self.debug:
+                    logger.warning(
+                        f'topic: {topic}, partition: {partition}, offset: {offset}, data: {val}'
+                    )
                 yield self._emit((id_val, val))
             else:
                 yield gen.sleep(self.poll_interval)
@@ -288,7 +248,7 @@ class from_kafka(Source):
         self._close_consumer()
 
     def start(self):
-
+        global consumer
         if self.stopped:
             self.stopped = False
             self.consumer = ck.Consumer(self.cpars)
@@ -297,6 +257,7 @@ class from_kafka(Source):
 
             # blocks for consumer thread to come up
             self.consumer.get_watermark_offsets(tp)
+            consumer = self.consumer
             self.loop.add_callback(self.poll_kafka)
 
     def _close_consumer(self):
@@ -308,9 +269,196 @@ class from_kafka(Source):
         self.stopped = True
 
 
+class FromKafkaBatched(Stream):
+    """Base class for both local and cluster-based batched kafka processing"""
+
+    def __init__(
+        self,
+        topics,
+        consumer_params,
+        poll_interval = '1s',
+        partitions = 5,
+        maxlen = 1000,
+        **kwargs,
+    ):
+        self.consumer_params = consumer_params
+        self.consumer_params['enable.auto.commit'] = False
+        self.topics = topics
+        self.partitions = partitions
+        self.positions = {}
+        self.poll_interval = convert_interval(poll_interval)
+        self.stopped = True
+        self.maxlen = maxlen
+
+        super(FromKafkaBatched, self).__init__(ensure_io_loop = True, **kwargs)
+
+    @gen.coroutine
+    def poll_kafka(self):
+        import confluent_kafka as ck
+
+        try:
+            while not self.stopped:
+                out = []
+                for tp in self.tps:
+                    topic = tp[0]
+                    partition = tp[1]
+                    tp = ck.TopicPartition(topic, partition, 0)
+                    print(tp)
+                    try:
+                        low, high = self.consumer.get_watermark_offsets(
+                            tp, timeout = 0.1
+                        )
+                        low = self.consumer.committed(
+                            [ck.TopicPartition(topic, partition)]
+                        )[0].offset
+                    except (RuntimeError, ck.KafkaException):
+                        continue
+
+                    current_position = self.positions.get(tp, 0)
+
+                    lowest = max(current_position, low)
+                    print(tp, high, lowest)
+                    if high > lowest:
+                        high = min(lowest + self.maxlen, high)
+                        out.append(
+                            (
+                                self.consumer_params,
+                                topic,
+                                partition,
+                                lowest,
+                                high - 1,
+                                self.maxlen,
+                            )
+                        )
+
+                        self.positions[tp] = lowest
+
+                    if len(out) == self.partitions:
+                        for part in out:
+                            yield self._emit(part)
+                        out = []
+                yield gen.sleep(self.poll_interval)
+        finally:
+            self.consumer.unsubscribe()
+            self.consumer.close()
+
+    def start(self):
+        import confluent_kafka as ck
+
+        if self.stopped:
+            self.consumer = ck.Consumer(self.consumer_params)
+            topics = self.consumer.list_topics().topics
+            tps = []
+            for t in self.topics:
+                for p in topics[t].partitions.keys():
+                    tps.append((t, p))
+
+            self.tps = cycle(tps)
+            self.stopped = False
+            tp = ck.TopicPartition(self.topics[0], 0, 0)
+            self.consumer.get_watermark_offsets(tp)
+            self.loop.add_callback(self.poll_kafka)
+
+
+@Stream.register_api(staticmethod)
+def from_kafka_batched(
+    topics,
+    consumer_params,
+    poll_interval = '1s',
+    partitions = 5,
+    start = False,
+    dask = False,
+    maxlen = 1000,
+    **kwargs,
+):
+    """
+
+    Parameters
+    ----------
+    topics: list of str
+        Labels of Kafka topics to consume from
+    consumer_params: dict
+        Settings to set up the stream, see
+        https://docs.confluent.io/current/clients/confluent-kafka-python/#configuration
+        https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
+        Examples:
+        bootstrap.servers, Connection string(s) (host:port) by which to reach
+        Kafka;
+        group.id, Identity of the consumer. If multiple sources share the same
+        group, each message will be passed to only one of them.
+    poll_interval: number
+        Seconds that elapse between polling Kafka for new messages
+    partitions: int, (default=5)
+        size of partitions to poll from kafka, this can be done parallel if `dask` is True.
+    start: bool, (default=False)
+        Whether to start polling upon instantiation
+    dask: bool, (default=False)
+        If True, partitions will poll in parallel manners.
+    maxlen: int, (default=1000)
+        max size of polling. sometime lag offset is really, so we don't to make any crash.
+    """
+
+    if dask:
+        from distributed.client import default_client
+
+        kwargs['loop'] = default_client().loop
+
+    source = FromKafkaBatched(
+        topics,
+        consumer_params,
+        poll_interval = poll_interval,
+        partitions = partitions,
+        maxlen = maxlen,
+        **kwargs,
+    )
+    if dask:
+        source = source.scatter()
+
+    if start:
+        source.start()
+
+    return source.starmap(get_message_batch)
+
+
+def get_message_batch(
+    kafka_params, topic, partition, low, high, maxlen, timeout = None
+):
+    """Fetch a batch of kafka messages (keys & values) in given topic/partition
+    This will block until messages are available, or timeout is reached.
+    """
+    import confluent_kafka as ck
+
+    t0 = time.time()
+    consumer = ck.Consumer(kafka_params)
+    tp = ck.TopicPartition(topic, partition, low)
+    consumer.assign([tp])
+    out = []
+    try:
+        while True:
+            msg = consumer.poll(0)
+            if msg and msg.value() and msg.error() is None:
+                if high >= msg.offset():
+                    partition = msg.partition()
+                    offset = msg.offset()
+                    topic = msg.topic()
+                    val = msg.value()
+                    id_val = f'{partition}<!>{offset}<!>{topic}'
+                    out.append((id_val, val))
+                if high <= msg.offset() or len(out) == maxlen:
+                    break
+            else:
+                time.sleep(0.1)
+                if timeout is not None and time.time() - t0 > timeout:
+                    break
+    finally:
+        consumer.close()
+    return out
+
+
 @Stream.register_api()
 class partition_time(Stream):
-    """ Partition stream into tuples if waiting time expired.
+    """
+    Partition stream into tuples if waiting time expired.
 
     Examples
     --------
@@ -342,3 +490,96 @@ class partition_time(Stream):
             return self._emit(tuple(result))
         else:
             return []
+
+
+@Stream.register_api()
+class foreach_map(Stream):
+    """ 
+    Apply a function to every element in a tuple in the stream.
+
+    Parameters
+    ----------
+    func: callable
+    *args :
+        The arguments to pass to the function.
+    **kwargs:
+        Keyword arguments to pass to func
+    Examples
+    --------
+    >>> source = Stream()
+    >>> source.foreach_map(lambda x: 2*x).sink(print)
+    >>> for i in range(3):
+    ...     source.emit((i, i))
+    (0, 0)
+    (2, 2)
+    (4, 4)
+    """
+
+    def __init__(self, upstream, func, *args, **kwargs):
+        self.func = func
+        stream_name = kwargs.pop('stream_name', None)
+        self.kwargs = kwargs
+        self.args = args
+
+        Stream.__init__(self, upstream, stream_name = stream_name)
+
+    def update(self, x, who = None):
+        try:
+            result = (self.func(e, *self.args, **self.kwargs) for e in x)
+        except Exception as e:
+            logger.exception(e)
+            raise
+        else:
+            return self._emit(result)
+
+
+@Stream.register_api()
+class foreach_async(Stream):
+    """ 
+    Apply a function to every element in a tuple in the stream, in async manner.
+
+    Parameters
+    ----------
+    func: callable
+    *args :
+        The arguments to pass to the function.
+    **kwargs:
+        Keyword arguments to pass to func
+
+    Examples
+    --------
+    >>> source = Stream()
+    >>> source.foreach_async(lambda x: 2*x).sink(print)
+    >>> for i in range(3):
+    ...     source.emit((i, i))
+    (0, 0)
+    (2, 2)
+    (4, 4)
+    """
+
+    def __init__(self, upstream, func, *args, **kwargs):
+        self.func = func
+        stream_name = kwargs.pop('stream_name', None)
+        self.kwargs = kwargs
+        self.args = args
+
+        Stream.__init__(self, upstream, stream_name = stream_name)
+
+    def update(self, x, who = None):
+        try:
+
+            @gen.coroutine
+            def function(e, *args, **kwargs):
+                return self.func(e, *args, **kwargs)
+
+            @gen.coroutine
+            def loop():
+                r = yield [function(e, *self.args, **self.kwargs) for e in x]
+                return r
+
+            result = loop().result()
+        except Exception as e:
+            logger.exception(e)
+            raise
+        else:
+            return self._emit(result)

@@ -118,6 +118,14 @@ For more complicated example, simply check notebooks in [example](example).
 
 ## usage
 
+* [waterhealer.from_kafka](#waterhealerfrom_kafka)
+* [waterhealer.from_kafka_batched](#waterhealerfrom_kafka_batched)
+* [waterhealer.healing](#waterhealerhealing)
+* [waterhealer.healing_batch](#waterhealerhealing_batch)
+* [partition_time](#partition_time)
+* [foreach_map](#foreach_map)
+* [foreach_async](#foreach_async)
+
 #### waterhealer.from_kafka
 
 ```python
@@ -137,15 +145,12 @@ class from_kafka(Source):
         Kafka;
         group.id, Identity of the consumer. If multiple sources share the same
         group, each message will be passed to only one of them.
-    maxlen_memory: int, (100000)
-        max size of memory (dict). Oldest automatically delete.
-    maxage_memory: int, (1800)
-        max age for each values in memory (dict). This will auto delete if the value stay too long in the memory.
     poll_interval: number
         Seconds that elapse between polling Kafka for new messages
-    start: bool, (False)
+    start: bool, (default=False)
         Whether to start polling upon instantiation
-
+    debug: bool, (default=False)
+        If True, will print topic, partition and offset for each polled message.
     """
 ```
 
@@ -155,9 +160,55 @@ class from_kafka(Source):
 (uuid, value)
 ```
 
-If you want to use waterhealer, you need to make sure `uuid` from `from_kafka` succesfully transported until sinking, or else it cannot update the offset.
+If you want to use waterhealer, you need to make sure `uuid` from `from_kafka` succesfully transported until healing, or else it cannot update the offset.
 
 **Output from `waterhealer.from_kafka` is different from any sources object from `streamz`, `streamz` only returned `value`, not tuple as `waterhealer.from_kafka`.**
+
+#### waterhealer.from_kafka_batched
+
+```python
+def from_kafka_batched(
+    topics,
+    consumer_params,
+    poll_interval = '1s',
+    partitions = 5,
+    start = False,
+    dask = False,
+    maxlen = 1000,
+    **kwargs,
+):
+    """
+
+    Parameters
+    ----------
+    topics: list of str
+        Labels of Kafka topics to consume from
+    consumer_params: dict
+        Settings to set up the stream, see
+        https://docs.confluent.io/current/clients/confluent-kafka-python/#configuration
+        https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
+        Examples:
+        bootstrap.servers, Connection string(s) (host:port) by which to reach
+        Kafka;
+        group.id, Identity of the consumer. If multiple sources share the same
+        group, each message will be passed to only one of them.
+    poll_interval: number
+        Seconds that elapse between polling Kafka for new messages
+    partitions: int, (default=5)
+        size of partitions to poll from kafka, this can be done parallel if `dask` is True.
+    start: bool, (default=False)
+        Whether to start polling upon instantiation
+    dask: bool, (default=False)
+        If True, partitions will poll in parallel manners.
+    maxlen: int, (default=1000)
+        max size of polling. sometime lag offset is really, so we don't to make any crash.
+    """
+
+```
+
+Same as `waterhealer.from_kafka`, but we pulled partitions in parallel manners.
+
+Example, [kafka-batch-dask-simple-plus.ipynb](example/kafka-batch-dask-simple-plus.ipynb)
 
 #### waterhealer.healing
 
@@ -269,3 +320,60 @@ class partition_time(Stream):
 This is different from [partition](https://streamz.readthedocs.io/en/latest/api.html#streamz.partition).
 
 `partition` only proceed to next flow if size is equal to `n`. But for `partition_time`, if waiting time is expired, it will proceed, does not care about the size, and expired time only calculated when an element came in.
+
+#### foreach_map
+
+```python
+class foreach_map(Stream):
+    """ Apply a function to every element in a tuple in the stream
+    Parameters
+    ----------
+    func: callable
+    *args :
+        The arguments to pass to the function.
+    **kwargs:
+        Keyword arguments to pass to func
+    Examples
+    --------
+    >>> source = Stream()
+    >>> source.foreach_map(lambda x: 2*x).sink(print)
+    >>> for i in range(3):
+    ...     source.emit((i, i))
+    (0, 0)
+    (2, 2)
+    (4, 4)
+    """
+```
+
+It is like `map`, but do `map` for each elements in a batch.
+
+#### foreach_async
+
+```python
+class foreach_async(Stream):
+    """ 
+    Apply a function to every element in a tuple in the stream, in async manner.
+
+    Parameters
+    ----------
+    func: callable
+    *args :
+        The arguments to pass to the function.
+    **kwargs:
+        Keyword arguments to pass to func
+
+    Examples
+    --------
+    >>> source = Stream()
+    >>> source.foreach_async(lambda x: 2*x).sink(print)
+    >>> for i in range(3):
+    ...     source.emit((i, i))
+    (0, 0)
+    (2, 2)
+    (4, 4)
+    """
+```
+
+It is like `map`, but do `map` for each elements in a batch in async manner.
+
+Example, [simple-plus-nested-batch.ipynb](example/simple-plus-nested-batch.ipynb)
