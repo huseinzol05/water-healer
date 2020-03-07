@@ -358,7 +358,7 @@ class foreach_map(Stream):
     """
 ```
 
-It is like `map`, but do `map` for each elements in a batch.
+It is like `map`, but do `map` for each elements in a batch in sequential manner.
 
 #### foreach_async
 
