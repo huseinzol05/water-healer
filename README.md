@@ -208,7 +208,7 @@ def from_kafka_batched(
 
 Same as `waterhealer.from_kafka`, but we pulled partitions in parallel manners.
 
-Example, [kafka-batch-dask-simple-plus.ipynb](example/kafka-batch-dask-simple-plus.ipynb)
+Example, [kafka-batch-dask-simple-plus-batch.ipynb](example/kafka-batch-dask-simple-plus-batch.ipynb)
 
 #### waterhealer.healing
 
