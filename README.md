@@ -305,8 +305,7 @@ return [{
     'partition': partition,
     'offset': offset,
     'topic': topic,
-}
-]
+}]
 ```
 
 A list of results `waterhealer.healing`.
