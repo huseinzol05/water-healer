@@ -109,7 +109,7 @@ source = wh.from_kafka(
     },
     healer = True)
 
-source.map(wh.healing, stream = source, callback = print)
+source.sink(wh.healing, stream = source)
 ```
 
 ## examples
@@ -216,11 +216,8 @@ Example, [kafka-batch-dask-simple-plus-batch.ipynb](example/kafka-batch-dask-sim
 def healing(
     row: Tuple,
     stream: Callable = None,
-    callback: Callable = None,
     ignore: bool = False,
-    silent: bool = False,
     asynchronous: bool = False,
-    **kwargs,
 ):
     """
 
@@ -229,26 +226,31 @@ def healing(
     row: tuple
         (uuid, value)
     stream: waterhealer object
-        waterhealer object to connect with kafka
-    callback: function
-        callback function after successful update
+        waterhealer object to connect with kafka.
     ignore: bool, (default=False)
-        if True, if uuid not in memory, it will not stop. 
-        This is useful when you do batch processing, you might delete some rows after did some unique operations.
-    silent: bool, (default=False)
-        if True, will not print any log in this function.
+        if True, ignore any failed update offset.
     asynchronous: bool, (default=False)
         if True, it will update kafka offset async manner.
-    **kwargs:
-        Keyword arguments to pass to callback.
-
     """
 ```
 
 Partial code can be like this,
 
 ```python
-.map(function).sink(healing)
+.map(function).sink(healing, stream = source)
+```
+
+This function will returned,
+
+```python
+return {
+    'data': row[1],
+    'success': success,
+    'reason': reason,
+    'partition': partition,
+    'offset': offset,
+    'topic': topic,
+}
 ```
 
 Example, [simple-plus-element.ipynb](example/simple-plus-element.ipynb)
@@ -261,11 +263,8 @@ Instead we do it one-by-one, we can do concurrent updates async manner.
 def healing_batch(
     rows: Tuple[Tuple],
     stream: Callable = None,
-    callback: Callable = None,
     ignore: bool = False,
-    silent: bool = False,
     asynchronous: bool = False,
-    **kwargs,
 ):
     """
 
@@ -275,26 +274,42 @@ def healing_batch(
         ((uuid, value),)
     stream: waterhealer object
         waterhealer object to connect with kafka
-    callback: function
-        callback function after successful update, apply for each element.
     ignore: bool, (default=False)
-        if True, if uuid not in memory, it will not stop. 
-        This is useful when you do batch processing, you might delete some rows after did some unique operations.
-    silent: bool, (default=False)
-        if True, will not print any log in this function.
+        if True, ignore any failed update offset.
     asynchronous: bool, (default=False)
         if True, it will update kafka offset async manner.
-    **kwargs:
-        Keyword arguments to pass to callback.
-
     """
 ```
 
 Partial code can be like this,
 
 ```python
-.map(function).partition(5).sink(healing_batch)
+.map(function).partition(5).sink(healing_batch, stream = source)
 ```
+
+This function will returned,
+
+```python
+return [{
+    'data': row[1],
+    'success': success,
+    'reason': reason,
+    'partition': partition,
+    'offset': offset,
+    'topic': topic,
+},
+{
+    'data': row[1],
+    'success': success,
+    'reason': reason,
+    'partition': partition,
+    'offset': offset,
+    'topic': topic,
+}
+]
+```
+
+A list of results `waterhealer.healing`.
 
 Example, [simple-plus-batch.ipynb](example/simple-plus-batch.ipynb)
 
@@ -375,5 +390,11 @@ class foreach_async(Stream):
 ```
 
 It is like `map`, but do `map` for each elements in a batch in async manner.
+
+Partial code can be like this,
+
+```python
+.map(function).partition(5).partition(5).foreach_async(wh.healing_batch, stream = source)
+```
 
 Example, [simple-plus-nested-batch.ipynb](example/simple-plus-nested-batch.ipynb)
