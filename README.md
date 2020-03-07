@@ -106,8 +106,7 @@ source = wh.from_kafka(
         'bootstrap.servers': 'localhost:9092',
         'group.id': 'group',
         'auto.offset.reset': 'latest',
-    },
-    healer = True)
+    })
 
 source.sink(wh.healing, stream = source)
 ```
