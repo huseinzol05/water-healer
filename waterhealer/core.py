@@ -121,6 +121,8 @@ def healing(
     """
     if type(stream) == streamz.dask.starmap:
         consumer = stream.upstreams[0].upstreams[0].consumer
+    elif type(stream) == streamz.core.starmap:
+        consumer = stream.upstreams[0].consumer
     else:
         consumer = stream.consumer
     result = _healing(
@@ -153,6 +155,8 @@ def healing_batch(
     """
     if type(stream) == streamz.dask.starmap:
         consumer = stream.upstreams[0].upstreams[0].consumer
+    elif type(stream) == streamz.core.starmap:
+        consumer = stream.upstreams[0].consumer
     else:
         consumer = stream.consumer
 
@@ -294,7 +298,6 @@ class FromKafkaBatched(Stream):
 
     @gen.coroutine
     def poll_kafka(self):
-        import confluent_kafka as ck
 
         try:
             while not self.stopped:
@@ -303,7 +306,6 @@ class FromKafkaBatched(Stream):
                     topic = tp[0]
                     partition = tp[1]
                     tp = ck.TopicPartition(topic, partition, 0)
-                    print(tp)
                     try:
                         low, high = self.consumer.get_watermark_offsets(
                             tp, timeout = 0.1
@@ -317,7 +319,6 @@ class FromKafkaBatched(Stream):
                     current_position = self.positions.get(tp, 0)
 
                     lowest = max(current_position, low)
-                    print(tp, high, lowest)
                     if high > lowest:
                         high = min(lowest + self.maxlen, high)
                         out.append(
@@ -331,7 +332,7 @@ class FromKafkaBatched(Stream):
                             )
                         )
 
-                        self.positions[tp] = lowest
+                        self.positions[tp] = high
 
                     if len(out) == self.partitions:
                         for part in out:
@@ -343,7 +344,6 @@ class FromKafkaBatched(Stream):
             self.consumer.close()
 
     def start(self):
-        import confluent_kafka as ck
 
         if self.stopped:
             self.consumer = ck.Consumer(self.consumer_params)
@@ -412,6 +412,8 @@ def from_kafka_batched(
         **kwargs,
     )
     if dask:
+        if not source.asynchronous:
+            source._set_asynchronous(False)
         source = source.scatter()
 
     if start:
@@ -452,6 +454,7 @@ def get_message_batch(
                     break
     finally:
         consumer.close()
+    logger.warning(len(out))
     return out
 
 
