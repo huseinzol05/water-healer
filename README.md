@@ -8,9 +8,20 @@
 
 **water-healer**, Extension of Kafka Streamz to update consumer offset for every successful sink.
 
-This library is an extension for Streamz library to provide `healing` offset for kafka topics.
+This library is an extension for Streamz library to provide `healing` offset for kafka topics and additional functions to stream pipeline.
 
 Anyone who never heard about streamz library, a great reactive programming library, can read more at https://streamz.readthedocs.io/en/latest/core.html
+
+## Table of contents
+
+  * [problem statement](#problem-statement)
+  * [Installing from the PyPI](#Installing-from-the-PyPI)
+  * [how-to](#how-to)
+  * [examples](#examples)
+  * [usage](#usage)
+    * [sources](#sources)
+    * [healing](#healing)
+    * [extension](#extension)
 
 ## problem statement
 
@@ -117,13 +128,10 @@ For more complicated example, simply check notebooks in [example](example).
 
 ## usage
 
+### sources
+
 * [waterhealer.from_kafka](#waterhealerfrom_kafka)
 * [waterhealer.from_kafka_batched](#waterhealerfrom_kafka_batched)
-* [waterhealer.healing](#waterhealerhealing)
-* [waterhealer.healing_batch](#waterhealerhealing_batch)
-* [partition_time](#partition_time)
-* [foreach_map](#foreach_map)
-* [foreach_async](#foreach_async)
 
 #### waterhealer.from_kafka
 
@@ -208,6 +216,11 @@ def from_kafka_batched(
 Same as `waterhealer.from_kafka`, but we pulled partitions in parallel manners.
 
 Example, [kafka-batch-dask-simple-plus-batch.ipynb](example/kafka-batch-dask-simple-plus-batch.ipynb)
+
+### healing
+
+* [waterhealer.healing](#waterhealerhealing)
+* [waterhealer.healing_batch](#waterhealerhealing_batch)
 
 #### waterhealer.healing
 
@@ -311,6 +324,11 @@ A list of results `waterhealer.healing`.
 
 Example, [simple-plus-batch.ipynb](example/simple-plus-batch.ipynb)
 
+### extension
+
+* [partition_time](#partition_time)
+* [foreach_map](#foreach_map)
+* [foreach_async](#foreach_async)
 
 #### partition_time
 
