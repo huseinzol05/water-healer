@@ -50,45 +50,52 @@ def _healing(row, consumer, ignore, asynchronous):
     if not consumer:
         raise Exception('consumer must not None')
     success = False
-    splitted = row[0].split('<!>')
-    if len(splitted) != 3:
+    if not isinstance(row[0], dict):
         reason = 'invalid uuid'
         partition = None
         offset = None
         topic = None
     else:
-        partition, offset, topic = splitted
-        offset = int(offset)
-        partition = int(partition)
-        low_offset, high_offset = consumer.get_watermark_offsets(
-            ck.TopicPartition(topic, partition)
-        )
-        current_offset = consumer.committed(
-            [ck.TopicPartition(topic, partition)]
-        )[0].offset
-
-        reason = (
-            f'committed topic: {topic} partition: {partition} offset: {offset}'
-        )
-
-        if current_offset >= high_offset:
-            reason = 'current offset already same as high offset, skip'
-        elif offset < current_offset:
-            reason = 'current offset higher than message offset, skip'
+        partition = row[0].get('partition')
+        offset = row[0].get('offset')
+        topic = row[0].get('topic')
+        if partition is None or offset is None or topic is None:
+            reason = 'invalid uuid'
+            partition = None
+            offset = None
+            topic = None
         else:
-            try:
-                consumer.commit(
-                    offsets = [ck.TopicPartition(topic, partition, offset + 1)],
-                    asynchronous = asynchronous,
-                )
-                success = True
-            except Exception as e:
-                if ignore:
-                    logging.warning(str(e))
-                    reason = str(e)
-                else:
-                    logger.exception(e)
-                    raise
+            offset = int(offset)
+            partition = int(partition)
+            low_offset, high_offset = consumer.get_watermark_offsets(
+                ck.TopicPartition(topic, partition)
+            )
+            current_offset = consumer.committed(
+                [ck.TopicPartition(topic, partition)]
+            )[0].offset
+
+            reason = f'committed topic: {topic} partition: {partition} offset: {offset}'
+
+            if current_offset >= high_offset:
+                reason = 'current offset already same as high offset, skip'
+            elif offset < current_offset:
+                reason = 'current offset higher than message offset, skip'
+            else:
+                try:
+                    consumer.commit(
+                        offsets = [
+                            ck.TopicPartition(topic, partition, offset + 1)
+                        ],
+                        asynchronous = asynchronous,
+                    )
+                    success = True
+                except Exception as e:
+                    if ignore:
+                        logging.warning(str(e))
+                        reason = str(e)
+                    else:
+                        logger.exception(e)
+                        raise
 
     return {
         'data': row[1],
@@ -239,7 +246,11 @@ class from_kafka(Source):
                 offset = val.offset()
                 topic = val.topic()
                 val = val.value()
-                id_val = f'{partition}<!>{offset}<!>{topic}'
+                id_val = {
+                    'partition': partition,
+                    'offset': offset,
+                    'topic': topic,
+                }
                 if self.debug:
                     logger.warning(
                         f'topic: {topic}, partition: {partition}, offset: {offset}, data: {val}'
@@ -252,7 +263,6 @@ class from_kafka(Source):
         self._close_consumer()
 
     def start(self):
-        global consumer
         if self.stopped:
             self.stopped = False
             self.consumer = ck.Consumer(self.cpars)
@@ -261,7 +271,6 @@ class from_kafka(Source):
 
             # blocks for consumer thread to come up
             self.consumer.get_watermark_offsets(tp)
-            consumer = self.consumer
             self.loop.add_callback(self.poll_kafka)
 
     def _close_consumer(self):
@@ -444,7 +453,11 @@ def get_message_batch(
                     offset = msg.offset()
                     topic = msg.topic()
                     val = msg.value()
-                    id_val = f'{partition}<!>{offset}<!>{topic}'
+                    id_val = {
+                        'partition': partition,
+                        'offset': offset,
+                        'topic': topic,
+                    }
                     out.append((id_val, val))
                 if high <= msg.offset() or len(out) == maxlen:
                     break
