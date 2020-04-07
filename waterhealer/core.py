@@ -78,7 +78,7 @@ def _healing(row, consumer, memory, ignore, asynchronous):
             offsets = list(m.keys())
             offsets.sort()
             if offsets.index(offset) == 0:
-                reasons, committed = [], []
+                reasons, committed, successes = [], [], []
                 for offset in offsets:
                     if m[offset]:
                         low_offset, high_offset = consumer.get_watermark_offsets(
@@ -88,6 +88,7 @@ def _healing(row, consumer, memory, ignore, asynchronous):
                             [ck.TopicPartition(topic, partition)]
                         )[0].offset
                         reason = f'committed topic: {topic} partition: {partition} offset: {offset}'
+                        success = False
                         if current_offset >= high_offset:
                             reason = 'current offset already same as high offset, skip'
                         elif offset < current_offset:
@@ -113,8 +114,12 @@ def _healing(row, consumer, memory, ignore, asynchronous):
                         m.pop(offset)
                         reasons.append(reason)
                         committed.append(offset)
+                        successes.append(success)
+                    else:
+                        break
                 reason = reasons
-                offset = offsets
+                offset = committed
+                success = successes
             else:
                 reason = (
                     'current offset is not the smallest, waiting for smallest'
