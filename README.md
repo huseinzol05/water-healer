@@ -128,13 +128,15 @@ second worker = return result, 2 seconds
 third worker = return result, 1 second
 ```
 
-So the queue be like, FIFO,
+The queue be like, FIFO,
 
 ```python
 queue = [3, 2, 1]
 ```
 
-So offset `3` comes first, but the problem here, offset `1` got error and we don't want to simply update offset `3` because it came first, we want to reprocess from offset `1`.
+Offset `3` comes first, but the problem here, offset `1` got error and we don't want to simply update offset `3` because it came first, we want to reprocess from offset `1`.
+
+So, water-healer will wait offset `1` first, after that will execute offset `2` and `3`.
 
 ## Installing from the PyPI
 
