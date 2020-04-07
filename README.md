@@ -15,6 +15,8 @@ Anyone who never heard about streamz library, a great reactive programming libra
 ## Table of contents
 
   * [problem statement](#problem-statement)
+    * [update offset during sinking](#update-offset-during-sinking)
+    * [update offset for distributed processing](#update-offset-for-distributed-processing)
   * [Installing from the PyPI](#Installing-from-the-PyPI)
   * [how-to](#how-to)
   * [examples](#examples)
@@ -24,6 +26,8 @@ Anyone who never heard about streamz library, a great reactive programming libra
     * [extension](#extension)
 
 ## problem statement
+
+### update offset during sinking
 
 Common Kafka consumer level developer use to `poll`, once it `poll`, consumer already updated offset for the topics whether the streaming successful or not, and we know, `processed-once` behavior of streaming processing. So if you stream a very important data related to finance or something like that, you wanted to reprocess that failed streaming.
 
@@ -97,6 +101,40 @@ During `poll`,
 Consumer already updated the offset even though the streaming is failed.
 
 On fourth polling, we should pull back `offset` 2, not 3.
+
+### update offset for distributed processing
+
+In a real world, some of realtime functions really took a long, maybe caused some long polling like merging data from database or waiting some events.
+
+Let say we have a single stream and 3 workers can execute a function in parallel manner, the function simply like,
+
+```python
+def foo(x):
+    # wait event, sometime x can caused very long waiting, sometime not
+    return
+```
+
+Our stream with 3 offsets, FIFO,
+
+```python
+offsets = [1, 2, 3]
+```
+
+So `1` will go to first worker, `2` will go to second worker, and `3` will go to third worker. The execution time as below,
+
+```text
+first worker = return error, 5 seconds
+second worker = return result, 2 seconds
+third worker = return result, 1 second
+```
+
+So the queue be like, FIFO,
+
+```python
+queue = [3, 2, 1]
+```
+
+So offset `3` comes first, but the problem here, offset `1` got error and we don't want to simply update offset `3` because it came first, we want to reprocess from offset `1`.
 
 ## Installing from the PyPI
 

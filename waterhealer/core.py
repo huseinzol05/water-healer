@@ -38,15 +38,21 @@ import confluent_kafka as ck
 import streamz
 import logging
 import asyncio
-from typing import Tuple, Callable, Dict
 import time
+from collections import defaultdict
+from expiringdict import ExpiringDict
+from typing import Tuple, Callable, Dict
 
 
 logger = logging.getLogger(__name__)
 
 
+def topic_partition_str(topic, partition):
+    return f'{topic}<!>{partition}'
+
+
 @gen.coroutine
-def _healing(row, consumer, ignore, asynchronous):
+def _healing(row, consumer, memory, ignore, asynchronous):
     if not consumer:
         raise Exception('consumer must not None')
     success = False
@@ -56,46 +62,63 @@ def _healing(row, consumer, ignore, asynchronous):
         offset = None
         topic = None
     else:
-        partition = row[0].get('partition')
+        partition = row[0].get('partition', '')
         offset = row[0].get('offset')
         topic = row[0].get('topic')
+        m = memory.get(topic_partition_str(topic, partition), [])
+
         if partition is None or offset is None or topic is None:
             reason = 'invalid uuid'
-            partition = None
-            offset = None
-            topic = None
+        elif not m:
+            reason = 'invalid topic and partition'
+        elif offset not in m:
+            reason = 'offset expired or not exist'
         else:
-            offset = int(offset)
-            partition = int(partition)
-            low_offset, high_offset = consumer.get_watermark_offsets(
-                ck.TopicPartition(topic, partition)
-            )
-            current_offset = consumer.committed(
-                [ck.TopicPartition(topic, partition)]
-            )[0].offset
-
-            reason = f'committed topic: {topic} partition: {partition} offset: {offset}'
-
-            if current_offset >= high_offset:
-                reason = 'current offset already same as high offset, skip'
-            elif offset < current_offset:
-                reason = 'current offset higher than message offset, skip'
+            m[offset] = True
+            offsets = list(m.keys())
+            offsets.sort()
+            if offsets.index(offset) == 0:
+                reasons, committed = [], []
+                for offset in offsets:
+                    if m[offset]:
+                        low_offset, high_offset = consumer.get_watermark_offsets(
+                            ck.TopicPartition(topic, partition)
+                        )
+                        current_offset = consumer.committed(
+                            [ck.TopicPartition(topic, partition)]
+                        )[0].offset
+                        reason = f'committed topic: {topic} partition: {partition} offset: {offset}'
+                        if current_offset >= high_offset:
+                            reason = 'current offset already same as high offset, skip'
+                        elif offset < current_offset:
+                            reason = 'current offset higher than message offset, skip'
+                        else:
+                            try:
+                                consumer.commit(
+                                    offsets = [
+                                        ck.TopicPartition(
+                                            topic, partition, offset + 1
+                                        )
+                                    ],
+                                    asynchronous = asynchronous,
+                                )
+                                success = True
+                            except Exception as e:
+                                if ignore:
+                                    logging.warning(str(e))
+                                    reason = str(e)
+                                else:
+                                    logger.exception(e)
+                                    raise
+                        m.pop(offset)
+                        reasons.append(reason)
+                        committed.append(offset)
+                reason = reasons
+                offset = offsets
             else:
-                try:
-                    consumer.commit(
-                        offsets = [
-                            ck.TopicPartition(topic, partition, offset + 1)
-                        ],
-                        asynchronous = asynchronous,
-                    )
-                    success = True
-                except Exception as e:
-                    if ignore:
-                        logging.warning(str(e))
-                        reason = str(e)
-                    else:
-                        logger.exception(e)
-                        raise
+                reason = (
+                    'current offset is not the smallest, waiting for smallest'
+                )
 
     return {
         'data': row[1],
@@ -128,13 +151,17 @@ def healing(
     """
     if type(stream) == streamz.dask.starmap:
         consumer = stream.upstreams[0].upstreams[0].consumer
+        memory = stream.upstreams[0].upstreams[0].memory
     elif type(stream) == streamz.core.starmap:
         consumer = stream.upstreams[0].consumer
+        memory = stream.upstreams[0].memory
     else:
         consumer = stream.consumer
+        memory = stream.memory
     result = _healing(
         row = row,
         consumer = consumer,
+        memory = memory,
         ignore = ignore,
         asynchronous = asynchronous,
     )
@@ -162,10 +189,13 @@ def healing_batch(
     """
     if type(stream) == streamz.dask.starmap:
         consumer = stream.upstreams[0].upstreams[0].consumer
+        memory = stream.upstreams[0].upstreams[0].memory
     elif type(stream) == streamz.core.starmap:
         consumer = stream.upstreams[0].consumer
+        memory = stream.upstreams[0].memory
     else:
         consumer = stream.consumer
+        memory = stream.memory
 
     @gen.coroutine
     def loop():
@@ -173,6 +203,7 @@ def healing_batch(
             _healing(
                 row = row,
                 consumer = consumer,
+                memory = memory,
                 ignore = ignore,
                 asynchronous = asynchronous,
             )
@@ -217,6 +248,8 @@ class from_kafka(Source):
         poll_interval = 0.1,
         start = False,
         debug = False,
+        maxlen_memory = 10000,
+        maxage_memory = 1800,
         **kwargs,
     ):
         self.cpars = consumer_params
@@ -230,6 +263,11 @@ class from_kafka(Source):
 
         if start:
             self.start()
+        self.memory = defaultdict(
+            lambda: ExpiringDict(
+                max_len = maxlen_memory, max_age_seconds = maxage_memory
+            )
+        )
 
     def do_poll(self):
         if self.consumer is not None:
@@ -255,6 +293,10 @@ class from_kafka(Source):
                     logger.warning(
                         f'topic: {topic}, partition: {partition}, offset: {offset}, data: {val}'
                     )
+
+                self.memory[topic_partition_str(topic, partition)][
+                    offset
+                ] = False
                 yield self._emit((id_val, val))
             else:
                 yield gen.sleep(self.poll_interval)
@@ -434,7 +476,8 @@ def from_kafka_batched(
 def get_message_batch(
     kafka_params, topic, partition, low, high, maxlen, timeout = None
 ):
-    """Fetch a batch of kafka messages (keys & values) in given topic/partition
+    """
+    Fetch a batch of kafka messages (keys & values) in given topic/partition
     This will block until messages are available, or timeout is reached.
     """
     import confluent_kafka as ck
