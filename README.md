@@ -261,7 +261,7 @@ total_time_source__inc__print_count 1.0
 
 We use `sys.getsizeof` to calculate data size, so, we might expect some headcost. By default metrics for time execution and data size will enable, to disable it, simply check [waterhealer.metrics](#waterhealermetrics).
 
-#### auto shutdown
+#### auto graceful delete
 
 Problem with streamz, it run everything in asynchronous manner, so it is very hard to make our Streamz script auto restart if got unproper exception handling. To make it auto restart if python script shutdown, you can run it in kubernetes or any auto restart program.
 
