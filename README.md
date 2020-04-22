@@ -263,7 +263,7 @@ We use `sys.getsizeof` to calculate data size, so, we might expect some headcost
 
 #### auto shutdown
 
-Problem with streamz, it run everything in asynchronous manner, so it is very hard to make our Streamz script auto restart if got unproper exception handling. To make it auto restart if python script shutdown, you can run it in kubernetes or any auto restart program.
+Problem with streamz, it run everything in asynchronous manner, so it is very hard to make our Streamz script auto restart if got unproper exception handling. To make it auto restart if python script shutdown, you can run it in kubernetes or any auto restart program after use this interface.
 
 ```python
 from time import sleep, time
@@ -283,7 +283,7 @@ wh.auto_shutdown(source, got_error = True)
 
 #### auto graceful delete
 
-We also want to Streamz script auto delete itself if no update offset after N seconds. This only work if we added `wh.healing` in our streaming.
+We also want to Streamz script auto delete itself if no update offset after N seconds. This only work if we added `wh.healing` in our streaming. To make it auto restart if python script shutdown, you can run it in kubernetes or any auto restart program after use this interface.
 
 ```python
 from time import sleep, time
