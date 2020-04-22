@@ -6,7 +6,7 @@ __packagename__ = 'water-healer'
 setuptools.setup(
     name = __packagename__,
     packages = setuptools.find_packages(),
-    version = '0.0.14',
+    version = '0.0.15',
     python_requires = '>=3.7.*',
     description = 'Extension of Kafka Streamz to update consumer offset for successful sink',
     author = 'huseinzol05',
@@ -17,6 +17,7 @@ setuptools.setup(
         'tornado',
         'expiringdict',
         'prometheus_client',
+        'APScheduler',
     ],
     license = 'MIT',
     classifiers = [
