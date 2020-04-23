@@ -30,46 +30,43 @@ THE POSSIBILITY OF SUCH DAMAGE.
 """
 
 from tornado import gen
-from streamz.core import Stream
+from streamz.core import Stream, convert_interval
 from datetime import datetime
 import time
 
 
 @Stream.register_api()
 class partition_time(Stream):
-    """
-    Partition stream into tuples if waiting time expired.
-
-    Examples
-    --------
-    >>> source = Stream()
-    >>> source.partition_time(3).sink(print)
-    >>> for i in range(10):
-    ...     source.emit(i)
-    (0, 1, 2)
-    (3, 4, 5)
-    (6, 7, 8)
+    """ 
+    Emit a tuple of collected results every interval
+    Every ``interval`` seconds this emits a tuple of all of the results
+    seen so far.  This can help to batch data coming off of a high-volume
+    stream. This interface will only emit if size of buffer bigger than 0.
     """
 
-    _graphviz_shape = 'diamond'
+    _graphviz_shape = 'octagon'
 
-    def __init__(self, upstream, n, **kwargs):
-        self.n = n
+    def __init__(self, upstream, interval, **kwargs):
+        self.interval = convert_interval(interval)
         self.buffer = []
-        self.time = None
-        Stream.__init__(self, upstream, **kwargs)
+        self.last = gen.moment
+
+        Stream.__init__(self, upstream, ensure_io_loop = True, **kwargs)
+
+        self.loop.add_callback(self.cb)
 
     def update(self, x, who = None):
         self.buffer.append(x)
-        if self.time is None:
-            self.time = datetime.now()
+        return self.last
 
-        if (datetime.now() - self.time).seconds >= self.n:
-            self.time = None
-            result, self.buffer = self.buffer, []
-            return self._emit(tuple(result))
-        else:
-            return []
+    @gen.coroutine
+    def cb(self):
+        while True:
+            L, self.buffer = self.buffer, []
+            if len(L):
+                self.last = self._emit(L)
+            yield self.last
+            yield gen.sleep(self.interval)
 
 
 @Stream.register_api()
