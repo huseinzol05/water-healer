@@ -47,9 +47,9 @@ Example,
 
 ```python
 # assume we have a topic `test`.
-# 1 partition, [1, 2, 3, 4]
+# 1 partition, [1, 2, 3, 4, 5, 6]
 # with first offset: 0
-# with last offset: 4
+# with last offset: 3
 
 # and we have a consumer group name, `group`.
 # `group` offset: 0
@@ -76,7 +76,7 @@ I just want to do simple pipeline, each element in topic just plus by one.
 
 def plus_one(row):
 
-    # a simple error
+    # a simple error to mimic programmer error
     if row > 3:
         raise Exception('row is bigger than 3!')
     return row + 1
@@ -88,31 +88,35 @@ During `poll`,
 
 ```python
 
+# remember our queue,    [  1,    2,    3,   4,   5,   6  ]
+# offsets             -1    0     1     2    3    4    5
+# when pulled at -1, we got element 1, pulled at 0 got element 2, and so on.
+
 # start python script,
-# `group` offset: 0
+# `group` offset: -1
 
 # every successful `poll`, it will automatically update the offset.
 
 # first polling,
-# `group` offset: 1
+# `group` offset: 0
 # kafka -> 1 -> plus_one(1) -> 2 -> print(2)
 
 # second polling,
-# `group` offset: 2
+# `group` offset: 1
 # kafka -> 2 -> plus_one(2) -> 3 -> print(3).
 
 # third polling,
-# `group` offset: 3
+# `group` offset: 2
 # kafka -> 3 -> plus_one(3) -> exception, halt
 
 # fourth polling, restart python script,
-# `group` offset: 4
+# `group` offset: 3
 # kafka -> 4 -> plus_one(4) -> exception, halt
 ```
 
 Consumer already updated the offset even though the streaming is failed.
 
-On fourth polling, we should pull back `offset` 2, not 3.
+On fourth polling, we should pull back `offset` 2, not proceed 
 
 ### update offset for distributed processing
 
@@ -149,6 +153,8 @@ queue = [3, 2, 1]
 Offset `3` comes first, but the problem here, offset `1` got error and we don't want to simply update offset `3` because it came first, we want to reprocess from offset `1`.
 
 So, water-healer will wait offset `1` first, after that will execute offset `2` and `3`.
+
+Or maybe this google slide can help you to understand more about water healer, [link to slide](https://docs.google.com/presentation/d/1ixiFIfcnVajMK8L6lY2hG_X5vipQ3gRk_ZsFjuXCWEY/edit?usp=sharing).
 
 ## Installing from the PyPI
 
