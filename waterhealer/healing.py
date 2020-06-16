@@ -185,7 +185,11 @@ def healing_batch(
 
 
 def auto_shutdown(
-    source, got_error: bool = True, graceful: int = 1800, interval: int = 1
+    source,
+    got_error: bool = True,
+    graceful: int = 1800,
+    interval: int = 1,
+    client = None,
 ):
     """
 
@@ -200,7 +204,8 @@ def auto_shutdown(
         To off it, set it to 0.
     interval: int, (default=1)
         check heartbeat every `interval`. 
-        
+    client: object, (default=None)
+        should be a dask client, will shutdown if client status not in ('running','closing','connecting','newly-created').
     """
 
     from apscheduler.schedulers.background import BackgroundScheduler
@@ -223,10 +228,28 @@ def auto_shutdown(
             )
             os._exit(1)
 
+    def check_dask():
+        try:
+            if client.status not in (
+                'running',
+                'closing',
+                'connecting',
+                'newly-created',
+            ):
+                logger.error(
+                    f'shutting down caused by disconnected dask cluster. Started auto_shutdown {str(start_time)}, ended {str(datetime.now())}'
+                )
+                os._exit(1)
+        except:
+            pass
+
     if got_error:
         scheduler.add_job(check_error, 'interval', seconds = interval)
 
     if graceful:
         scheduler.add_job(check_graceful, 'interval', seconds = interval)
+
+    if client:
+        scheduler.add_job(check_dask, 'interval', seconds = interval)
 
     scheduler.start()

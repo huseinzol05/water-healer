@@ -307,6 +307,15 @@ wh.auto_shutdown(source, graceful = 3600)
 
 `wh.auto_shutdown(source, graceful = 3600)` will shutdown after 3600 seconds if no update offset after 3600 seconds. To disable it, simply `wh.auto_shutdown(source, graceful = 0)`.
 
+#### auto shutdown dask
+
+When dask client disconnected with dask cluster, `wh.healing` also can helps us to shutdown the script.
+
+```python
+client = Client()
+wh.auto_shutdown(source, graceful = 3600, client = client)
+```
+
 ## Usage
 
 ### kafka
@@ -553,7 +562,11 @@ def metrics(
 
 ```python
 def auto_shutdown(
-    source, got_error: bool = True, graceful: int = 1800, interval: int = 1
+    source,
+    got_error: bool = True,
+    graceful: int = 1800,
+    interval: int = 1,
+    client = None,
 ):
     """
 
@@ -568,7 +581,8 @@ def auto_shutdown(
         To off it, set it to 0.
     interval: int, (default=1)
         check heartbeat every `interval`. 
-        
+    client: object, (default=None)
+        should be a dask client, will shutdown if client status not in ('running','closing','connecting','newly-created').
     """
 ```
 
