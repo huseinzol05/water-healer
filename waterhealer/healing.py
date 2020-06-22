@@ -9,7 +9,7 @@ import os
 from waterhealer.function import topic_partition_str
 
 last_updated = datetime.now()
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
 
 
 @gen.coroutine
@@ -189,6 +189,7 @@ def auto_shutdown(
     got_error: bool = True,
     graceful: int = 1800,
     interval: int = 1,
+    sleep_before_shutdown: int = 10,
     client = None,
 ):
     """
@@ -219,6 +220,7 @@ def auto_shutdown(
             logger.error(
                 f'shutting down caused by exception. Started auto_shutdown {str(start_time)}, ended {str(datetime.now())}'
             )
+            time.sleep(sleep_before_shutdown)
             os._exit(1)
 
     def check_graceful():
@@ -226,6 +228,7 @@ def auto_shutdown(
             logger.error(
                 f'shutting down caused by expired time. Started auto_shutdown {str(start_time)}, ended {str(datetime.now())}'
             )
+            time.sleep(sleep_before_shutdown)
             os._exit(1)
 
     def check_dask():
@@ -239,6 +242,7 @@ def auto_shutdown(
                 logger.error(
                     f'shutting down caused by disconnected dask cluster. Started auto_shutdown {str(start_time)}, ended {str(datetime.now())}'
                 )
+                time.sleep(sleep_before_shutdown)
                 os._exit(1)
         except:
             pass
