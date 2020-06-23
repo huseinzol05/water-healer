@@ -6,6 +6,7 @@ import streamz
 import asyncio
 import logging
 import os
+import time
 from waterhealer.function import topic_partition_str
 
 last_updated = datetime.now()
@@ -191,6 +192,7 @@ def auto_shutdown(
     interval: int = 1,
     sleep_before_shutdown: int = 10,
     client = None,
+    debug = False,
 ):
     """
 
@@ -207,6 +209,8 @@ def auto_shutdown(
         check heartbeat every `interval`. 
     client: object, (default=None)
         should be a dask client, will shutdown if client status not in ('running','closing','connecting','newly-created').
+    debug: bool, (default=False)
+        If True, will print logging.error if got any error.
     """
 
     from apscheduler.schedulers.background import BackgroundScheduler
@@ -217,17 +221,19 @@ def auto_shutdown(
 
     def check_error():
         if len(source.loop.asyncio_loop._scheduled) == 0:
-            logger.error(
-                f'shutting down caused by exception. Started auto_shutdown {str(start_time)}, ended {str(datetime.now())}'
-            )
+            if debug:
+                logger.error(
+                    f'shutting down caused by exception. Started auto_shutdown {str(start_time)}, ended {str(datetime.now())}'
+                )
             time.sleep(sleep_before_shutdown)
             os._exit(1)
 
     def check_graceful():
         if (datetime.now() - last_updated).seconds > graceful:
-            logger.error(
-                f'shutting down caused by expired time. Started auto_shutdown {str(start_time)}, ended {str(datetime.now())}'
-            )
+            if debug:
+                logger.error(
+                    f'shutting down caused by expired time. Started auto_shutdown {str(start_time)}, ended {str(datetime.now())}'
+                )
             time.sleep(sleep_before_shutdown)
             os._exit(1)
 
@@ -239,9 +245,10 @@ def auto_shutdown(
                 'connecting',
                 'newly-created',
             ):
-                logger.error(
-                    f'shutting down caused by disconnected dask cluster. Started auto_shutdown {str(start_time)}, ended {str(datetime.now())}'
-                )
+                if debug:
+                    logger.error(
+                        f'shutting down caused by disconnected dask cluster. Started auto_shutdown {str(start_time)}, ended {str(datetime.now())}'
+                    )
                 time.sleep(sleep_before_shutdown)
                 os._exit(1)
         except:

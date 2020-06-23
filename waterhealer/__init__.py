@@ -3,4 +3,4 @@ from .healing import healing, healing_batch, auto_shutdown
 from .source import metrics
 from .dask import *
 
-__version__ = '0.0.19'
+__version__ = '0.0.21'
