@@ -187,12 +187,12 @@ def healing_batch(
 
 def auto_shutdown(
     source,
-    got_error: bool = True,
+    got_error: bool = False,
     graceful: int = 1800,
     interval: int = 1,
     sleep_before_shutdown: int = 10,
     client = None,
-    debug = False,
+    debug: bool = False,
 ):
     """
 
@@ -220,13 +220,22 @@ def auto_shutdown(
     start_time = datetime.now()
 
     def check_error():
-        if len(source.loop.asyncio_loop._scheduled) == 0:
-            if debug:
-                logger.error(
-                    f'shutting down caused by exception. Started auto_shutdown {str(start_time)}, ended {str(datetime.now())}'
-                )
-            time.sleep(sleep_before_shutdown)
-            os._exit(1)
+        try:
+            for key, v in client.futures.copy().items():
+                if (
+                    'dict' not in key
+                    and 'str' not in key
+                    and 'byte' not in key
+                    and 'json_loads' not in key
+                    and v.status == 'error'
+                ):
+                    if debug:
+                        logger.error(
+                            f'shutting down caused by exception. Started auto_shutdown {str(start_time)}, ended {str(datetime.now())}'
+                        )
+                    os._exit(1)
+        except:
+            pass
 
     def check_graceful():
         if (datetime.now() - last_updated).seconds > graceful:
