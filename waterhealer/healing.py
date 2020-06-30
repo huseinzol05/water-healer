@@ -187,10 +187,10 @@ def healing_batch(
 
 def auto_shutdown(
     source,
-    got_error: bool = False,
+    got_error: bool = True,
     graceful: int = 1800,
     interval: int = 1,
-    sleep_before_shutdown: int = 10,
+    sleep_before_shutdown: int = 20,
     client = None,
     debug: bool = False,
 ):
@@ -233,6 +233,7 @@ def auto_shutdown(
                         logger.error(
                             f'shutting down caused by exception. Started auto_shutdown {str(start_time)}, ended {str(datetime.now())}'
                         )
+                    time.sleep(sleep_before_shutdown)
                     os._exit(1)
         except:
             pass
