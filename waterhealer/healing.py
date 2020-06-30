@@ -190,7 +190,7 @@ def auto_shutdown(
     got_error: bool = True,
     graceful: int = 1800,
     interval: int = 1,
-    sleep_before_shutdown: int = 20,
+    sleep_before_shutdown: int = 120,
     client = None,
     debug: bool = False,
 ):
@@ -207,6 +207,8 @@ def auto_shutdown(
         To off it, set it to 0.
     interval: int, (default=1)
         check heartbeat every `interval`. 
+    sleep_before_shutdown: int, (defaut=120)
+        sleep (second) before shutdown.
     client: object, (default=None)
         should be a dask client, will shutdown if client status not in ('running','closing','connecting','newly-created').
     debug: bool, (default=False)
