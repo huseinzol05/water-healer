@@ -35,6 +35,8 @@ This library also added streaming metrics, auto-shutdown, auto-graceful and addi
       * [partition_time](#partition_time)
       * [foreach_map](#foreach_map)
       * [foreach_async](#foreach_async)
+    * [checker](#checker)
+      * [check_leakage](#check_leakage)
   * [Examples](#Examples)
 
 ## Problem statement
@@ -676,6 +678,18 @@ Partial code can be like this,
 ```
 
 Example, [simple-plus-nested-batch.ipynb](example/simple-plus-nested-batch.ipynb)
+
+## checker
+
+#### check_leakage
+
+A decorator to check UUID leakage in before and after UUIDs.
+
+```python
+@check_leakage
+def func(rows):
+    # do something cause after uuid not same as before uuid
+```
 
 ## Examples
 
