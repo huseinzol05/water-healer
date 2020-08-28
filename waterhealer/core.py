@@ -46,6 +46,8 @@ from tornado import gen
 from tornado.locks import Condition
 from tornado.ioloop import IOLoop
 from tornado.queues import Queue
+from distributed import Future
+import os
 
 try:
     from tornado.ioloop import PollIOLoop
@@ -67,8 +69,17 @@ thread_state = threading.local()
 
 logger = logging.getLogger(__name__)
 
-
 _io_loops = []
+
+
+def to_bool(value):
+    if value in (1, 'true'):
+        return True
+    else:
+        return False
+
+
+DISABLE_CHECKPOINTING = to_bool(os.environ.get('DISABLE_CHECKPOINTING', False))
 
 
 def get_io_loop(asynchronous = None):
@@ -87,6 +98,37 @@ def get_io_loop(asynchronous = None):
 
 def identity(x):
     return x
+
+
+def get_args(client, key):
+    def _get_args(key, dask_scheduler = None):
+        ts = dask_scheduler.tasks.get(key)
+        if ts:
+            args = ts.run_spec
+        else:
+            args = None
+        return {'task': args}
+
+    s = client.run_on_scheduler(_get_args, key)
+    if 'args' in s['task']:
+        args = cloudpickle.loads(s['task']['args'])
+    else:
+        args = None
+
+    if args:
+        if isinstance(args, tuple) or isinstance(args, list):
+            if isinstance(args[0], tuple) or isinstance(args[0], list):
+                if isinstance(args[0][0], tuple) or isinstance(
+                    args[0][0], list
+                ):
+                    data = args[0][0]
+                else:
+                    data = args[0]
+            else:
+                data = args
+        else:
+            data = [args]
+    return data
 
 
 class Stream(object):
@@ -367,6 +409,14 @@ class Stream(object):
 
         return output._ipython_display_(**kwargs)
 
+    def wait(self):
+        from distributed.client import default_client
+
+        client = default_client()
+
+        for k, v in self.checkpoint.items():
+            self.checkpoint[k] = client.gather(v)
+
     def _climb(self, source, name, x):
 
         for upstream in list(source.upstreams):
@@ -381,7 +431,7 @@ class Stream(object):
 
     def _emit(self, x):
 
-        if self._checkpoint:
+        if self._checkpoint and not DISABLE_CHECKPOINTING:
             name = type(self).__name__
             if hasattr(self, 'func'):
                 name = f'{name}.{self.func.__name__}'
@@ -478,7 +528,7 @@ class Stream(object):
             self.upstreams.remove(upstream)
 
     def scatter(self, **kwargs):
-        from .dask import scatter
+        from streamz.dask import scatter
 
         return scatter(self, **kwargs)
 

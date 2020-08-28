@@ -349,6 +349,23 @@ Output is,
 {'Stream.map.increment': 2, 'Stream.map.increment.map.increment_plus2': 4}
 ```
 
+Check more extensive example including Dask checkpointing on [dask-checkpointing.ipynb](example/dask-checkpointing.ipynb).
+
+#### Disable checkpointing using OS environment
+
+Incase we are so lazy to remove `checkpoint = True`, we can disable checkpointing using OS environment, by simply set,
+
+```bash
+export DISABLE_CHECKPOINTING=true
+```
+
+Or pythonic way,
+
+```bash
+import os
+os.environ['DISABLE_CHECKPOINTING'] = 'true'
+```
+
 ## Usage
 
 ### kafka

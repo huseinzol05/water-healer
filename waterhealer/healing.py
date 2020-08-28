@@ -189,7 +189,7 @@ def auto_shutdown(
     source,
     got_error: bool = True,
     graceful: int = 1800,
-    interval: int = 1,
+    interval: int = 5,
     sleep_before_shutdown: int = 120,
     client = None,
     debug: bool = False,
@@ -205,7 +205,7 @@ def auto_shutdown(
     graceful: int, (default=1800)
         automatically shutdown the script if water-healer not updated any offsets after `graceful` period. 
         To off it, set it to 0.
-    interval: int, (default=1)
+    interval: int, (default=5)
         check heartbeat every `interval`. 
     sleep_before_shutdown: int, (defaut=120)
         sleep (second) before shutdown.
