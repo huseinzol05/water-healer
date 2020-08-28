@@ -22,6 +22,7 @@ This library also added streaming metrics, auto-shutdown, auto-graceful and addi
     * [auto shutdown](#auto-shutdown)
     * [auto graceful delete](#auto-graceful-delete)
     * [checkpointing](#checkpointing)
+      * [disable checkpointing using OS environment](#disable-checkpointing-using-os-environment)
   * [Usage](#Usage)
     * [kafka](#kafka)
       * [waterhealer.from_kafka](#waterhealerfrom_kafka)
@@ -351,7 +352,7 @@ Output is,
 
 Check more extensive example including Dask checkpointing on [dask-checkpointing.ipynb](example/dask-checkpointing.ipynb).
 
-#### Disable checkpointing using OS environment
+#### disable checkpointing using OS environment
 
 Incase we are so lazy to remove `checkpoint = True`, we can disable checkpointing using OS environment, by simply set,
 
