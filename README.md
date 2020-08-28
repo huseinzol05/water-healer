@@ -21,6 +21,7 @@ This library also added streaming metrics, auto-shutdown, auto-graceful and addi
     * [streaming metrics](#streaming-metrics)
     * [auto shutdown](#auto-shutdown)
     * [auto graceful delete](#auto-graceful-delete)
+    * [checkpointing](#checkpointing)
   * [Usage](#Usage)
     * [kafka](#kafka)
       * [waterhealer.from_kafka](#waterhealerfrom_kafka)
@@ -166,7 +167,7 @@ pip install water-healer
 
 ## How-to
 
-#### update offset
+### update offset
 
 To understand technically of update offset, simply can read at [Problem statement](#Problem-statement)
 
@@ -189,7 +190,7 @@ We need to use `waterhealer.from_kafka` for streaming source, and use `waterheal
 
 Simply can read more about [waterhealer.from_kafka](#waterhealerfrom_kafka) and [waterhealer.healing](#waterhealerhealing)
 
-#### streaming metrics
+### streaming metrics
 
 Now we have a simple streaming,
 
@@ -269,7 +270,7 @@ total_time_source__inc__print_count 1.0
 
 We use `sys.getsizeof` to calculate data size, so, we might expect some headcost. By default metrics for time execution and data size will enable, to disable it, simply check [waterhealer.metrics](#waterhealermetrics).
 
-#### auto shutdown
+### auto shutdown
 
 Problem with streamz, it run everything in asynchronous manner, so it is very hard to make our Streamz script auto restart if got unproper exception handling. To make it auto restart if python script shutdown, you can run it in kubernetes or any auto restart program after use this interface.
 
@@ -289,7 +290,7 @@ wh.auto_shutdown(source, got_error = True)
 
 `wh.auto_shutdown` will wait event loop to close, if closed, halt python script.
 
-#### auto graceful delete
+### auto graceful delete
 
 We also want to Streamz script auto delete itself if no update offset after N seconds. This only work if we added `wh.healing` in our streaming. To make it auto restart if python script shutdown, you can run it in kubernetes or any auto restart program after use this interface.
 
@@ -309,13 +310,43 @@ wh.auto_shutdown(source, graceful = 3600)
 
 `wh.auto_shutdown(source, graceful = 3600)` will shutdown after 3600 seconds if no update offset after 3600 seconds. To disable it, simply `wh.auto_shutdown(source, graceful = 0)`.
 
-#### auto shutdown dask
+### auto shutdown dask
 
 When dask client disconnected with dask cluster, `wh.healing` also can helps us to shutdown the script.
 
 ```python
 client = Client()
 wh.auto_shutdown(source, graceful = 3600, client = client)
+```
+
+### checkpointing
+
+Let say every emit, I want to store value from each nodes returned, example as,
+
+![alt text](image/stream.png)
+
+Checkpointing is really good for debugging purpose especially if we use dask to do distributed processing, so to enable checkpointing, simply,
+
+```python
+import waterhealer as wh
+from waterhealer import Stream
+
+def increment(x):
+    return x + 1
+
+def increment_plus2(x):
+    return x + 2
+
+source = Stream()
+source.map(increment, checkpoint = True).map(increment_plus2, checkpoint = True).sink(print)
+source.emit(1)
+print(source.checkpoint)
+```
+
+Output is,
+
+```python
+{'Stream.map.increment': 2, 'Stream.map.increment.map.increment_plus2': 4}
 ```
 
 ## Usage

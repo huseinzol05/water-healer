@@ -18,6 +18,9 @@ setuptools.setup(
         'expiringdict',
         'prometheus_client',
         'APScheduler',
+        'confluent_kafka',
+        'networkx==2.3',
+        'graphviz',
     ],
     license = 'MIT',
     classifiers = [

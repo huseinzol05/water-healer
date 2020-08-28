@@ -1,5 +1,5 @@
 from tornado import gen
-from streamz.core import Stream, convert_interval
+from waterhealer.core import Stream, convert_interval
 from streamz.sources import Source
 from itertools import cycle
 from collections import defaultdict
