@@ -8,7 +8,7 @@
 
 **water-healer**, Extension of Streamz to update Kafka consumer offset for every successful sink.
 
-This library also added streaming metrics, auto-shutdown, auto-graceful and additional functions to stream pipeline.
+This library also added streaming metrics, auto-shutdown, auto-graceful, checkpointing and additional functions to stream pipeline.
 
 ## Table of contents
 
