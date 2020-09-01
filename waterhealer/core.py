@@ -409,13 +409,48 @@ class Stream(object):
 
         return output._ipython_display_(**kwargs)
 
-    def wait(self):
+    def wait(self, wait_time_last_node = 2):
         from distributed.client import default_client
+        import time
 
-        client = default_client()
+        try:
+            client = default_client()
+        except Exception as e:
+            logger.warning(e)
+            return False
+
+        def get_last(source):
+            x = []
+
+            def loop(s):
+                for downstream in s.downstreams:
+                    if downstream._checkpoint:
+                        name = type(downstream).__name__
+                        if hasattr(downstream, 'func'):
+                            name = f'{name}.{downstream.func.__name__}'
+                        last = name
+                        x.append(last)
+                    loop(downstream)
+
+            loop(source)
+            return x[-1]
+
+        last_name = get_last(self)
+
+        while True:
+            found = False
+            for k in self.checkpoint.keys():
+                if last_name in k:
+                    found = True
+                    break
+            if found:
+                break
+            time.sleep(wait_time_last_node)
 
         for k, v in self.checkpoint.items():
             self.checkpoint[k] = client.gather(v)
+
+        return True
 
     def _climb(self, source, name, x):
 
