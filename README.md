@@ -313,7 +313,7 @@ wh.auto_shutdown(source, graceful = 3600)
 
 ### auto shutdown dask
 
-When dask client disconnected with dask cluster, `wh.healing` also can helps us to shutdown the script.
+When dask client disconnected with dask cluster, `wh.auto_shutdown` also can helps us to shutdown the script.
 
 ```python
 client = Client()
@@ -349,6 +349,8 @@ Output is,
 ```python
 {'Stream.map.increment': 2, 'Stream.map.increment.map.increment_plus2': 4}
 ```
+
+Checkpointing also can put on `zip`, `sink`, and other interfaces.
 
 Check more extensive example including Dask checkpointing on [dask-checkpointing.ipynb](example/dask-checkpointing.ipynb).
 
