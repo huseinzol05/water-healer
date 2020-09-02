@@ -1104,13 +1104,7 @@ class timed_window(Stream):
         self.buffer = []
         self.last = gen.moment
 
-        Stream.__init__(
-            self,
-            upstream,
-            ensure_io_loop = True,
-            checkpoint = checkpoint,
-            **kwargs,
-        )
+        Stream.__init__(self, upstream, ensure_io_loop = True, **kwargs)
 
         self.loop.add_callback(self.cb)
 

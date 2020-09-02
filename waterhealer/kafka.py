@@ -1,6 +1,5 @@
 from tornado import gen
 from waterhealer.core import Stream, convert_interval
-from streamz.sources import Source
 from itertools import cycle
 from collections import defaultdict
 from expiringdict import ExpiringDict
@@ -11,6 +10,18 @@ from waterhealer.function import topic_partition_str
 
 
 logger = logging.getLogger(__name__)
+
+
+class Source(Stream):
+    _graphviz_shape = 'doubleoctagon'
+
+    def __init__(self, **kwargs):
+        self.stopped = True
+        super(Source, self).__init__(**kwargs)
+
+    def stop(self):
+        if not self.stopped:
+            self.stopped = True
 
 
 @Stream.register_api(staticmethod)
