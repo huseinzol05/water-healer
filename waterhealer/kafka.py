@@ -60,8 +60,8 @@ class from_kafka(Source):
         poll_interval = 0.1,
         start = False,
         debug = False,
-        maxlen_memory = 10000,
-        maxage_memory = 1800,
+        maxlen_memory = 300_000,
+        maxage_memory = 3600,
         **kwargs,
     ):
         self.cpars = consumer_params

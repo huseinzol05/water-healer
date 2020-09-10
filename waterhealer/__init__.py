@@ -5,4 +5,4 @@ from .core import *
 from .dask import *
 from . import checker
 
-__version__ = '0.0.28'
+__version__ = '0.0.29'
