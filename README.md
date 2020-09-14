@@ -24,21 +24,23 @@ This library also added streaming metrics, auto-shutdown, auto-graceful, checkpo
     * [checkpointing](#checkpointing)
       * [disable checkpointing using OS environment](#disable-checkpointing-using-os-environment)
   * [Usage](#Usage)
-    * [kafka](#kafka)
-      * [waterhealer.from_kafka](#waterhealerfrom_kafka)
-      * [waterhealer.from_kafka_batched](#waterhealerfrom_kafka_batched)
-    * [healing](#healing)
-      * [waterhealer.healing](#waterhealerhealing)
-      * [waterhealer.healing_batch](#waterhealerhealing_batch)
-    * [source](#source)
-      * [waterhealer.metrics](#waterhealermetrics)
-      * [waterhealer.auto_shutdown](#waterhealerauto_shutdown)
-    * [extension](#extension)
+    * [checker](#checker)
+      * [check_leakage](#check_leakage)
+    * [core](#extension)
       * [partition_time](#partition_time)
       * [foreach_map](#foreach_map)
       * [foreach_async](#foreach_async)
-    * [checker](#checker)
-      * [check_leakage](#check_leakage)
+    * [healing](#healing)
+      * [waterhealer.healing](#waterhealerhealing)
+      * [waterhealer.healing_batch](#waterhealerhealing_batch)
+    * [kafka](#kafka)
+      * [waterhealer.from_kafka](#waterhealerfrom_kafka)
+      * [waterhealer.from_kafka_batched](#waterhealerfrom_kafka_batched)
+    * [plugin](#plugin)
+      * [waterhealer.plugin.error_logging](#waterhealerpluginerror_logging)
+    * [source](#source)
+      * [waterhealer.metrics](#waterhealermetrics)
+      * [waterhealer.auto_shutdown](#waterhealerauto_shutdown)
   * [Examples](#Examples)
 
 ## Problem statement
@@ -371,6 +373,109 @@ os.environ['DISABLE_CHECKPOINTING'] = 'true'
 
 ## Usage
 
+### checker
+
+#### check_leakage
+
+A decorator to check UUID leakage in before and after UUIDs.
+
+```python
+@check_leakage
+def func(rows):
+    # do something cause after uuid not same as before uuid
+```
+
+### core
+
+* [partition_time](#partition_time)
+* [foreach_map](#foreach_map)
+* [foreach_async](#foreach_async)
+
+#### partition_time
+
+```python
+class partition_time(Stream):
+    """ Partition stream into tuples if waiting time expired.
+
+    Examples
+    --------
+    >>> source = Stream()
+    >>> source.partition_time(3).sink(print)
+    >>> for i in range(10):
+    ...     source.emit(i)
+    (0, 1, 2)
+    (3, 4, 5)
+    (6, 7, 8)
+    """
+```
+
+This is different from [partition](https://streamz.readthedocs.io/en/latest/api.html#streamz.partition).
+
+`partition` only proceed to next flow if size is equal to `n`. But for `partition_time`, if waiting time is expired, it will proceed, does not care about the size, and expired time only calculated when an element came in.
+
+#### foreach_map
+
+```python
+class foreach_map(Stream):
+    """ Apply a function to every element in a tuple in the stream
+    Parameters
+    ----------
+    func: callable
+    *args :
+        The arguments to pass to the function.
+    **kwargs:
+        Keyword arguments to pass to func
+    Examples
+    --------
+    >>> source = Stream()
+    >>> source.foreach_map(lambda x: 2*x).sink(print)
+    >>> for i in range(3):
+    ...     source.emit((i, i))
+    (0, 0)
+    (2, 2)
+    (4, 4)
+    """
+```
+
+It is like `map`, but do `map` for each elements in a batch in sequential manner.
+
+#### foreach_async
+
+```python
+class foreach_async(Stream):
+    """ 
+    Apply a function to every element in a tuple in the stream, in async manner.
+
+    Parameters
+    ----------
+    func: callable
+    *args :
+        The arguments to pass to the function.
+    **kwargs:
+        Keyword arguments to pass to func
+
+    Examples
+    --------
+    >>> source = Stream()
+    >>> source.foreach_async(lambda x: 2*x).sink(print)
+    >>> for i in range(3):
+    ...     source.emit((i, i))
+    (0, 0)
+    (2, 2)
+    (4, 4)
+    """
+```
+
+It is like `map`, but do `map` for each elements in a batch in async manner.
+
+Partial code can be like this,
+
+```python
+.map(function).partition(5).partition(5).foreach_async(wh.healing_batch, stream = source)
+```
+
+Example, [simple-plus-nested-batch.ipynb](example/simple-plus-nested-batch.ipynb)
+
 ### kafka
 
 * [waterhealer.from_kafka](#waterhealerfrom_kafka)
@@ -637,109 +742,6 @@ def auto_shutdown(
     client: object, (default=None)
         should be a dask client, will shutdown if client status not in ('running','closing','connecting','newly-created').
     """
-```
-
-### extension
-
-* [partition_time](#partition_time)
-* [foreach_map](#foreach_map)
-* [foreach_async](#foreach_async)
-
-#### partition_time
-
-```python
-class partition_time(Stream):
-    """ Partition stream into tuples if waiting time expired.
-
-    Examples
-    --------
-    >>> source = Stream()
-    >>> source.partition_time(3).sink(print)
-    >>> for i in range(10):
-    ...     source.emit(i)
-    (0, 1, 2)
-    (3, 4, 5)
-    (6, 7, 8)
-    """
-```
-
-This is different from [partition](https://streamz.readthedocs.io/en/latest/api.html#streamz.partition).
-
-`partition` only proceed to next flow if size is equal to `n`. But for `partition_time`, if waiting time is expired, it will proceed, does not care about the size, and expired time only calculated when an element came in.
-
-#### foreach_map
-
-```python
-class foreach_map(Stream):
-    """ Apply a function to every element in a tuple in the stream
-    Parameters
-    ----------
-    func: callable
-    *args :
-        The arguments to pass to the function.
-    **kwargs:
-        Keyword arguments to pass to func
-    Examples
-    --------
-    >>> source = Stream()
-    >>> source.foreach_map(lambda x: 2*x).sink(print)
-    >>> for i in range(3):
-    ...     source.emit((i, i))
-    (0, 0)
-    (2, 2)
-    (4, 4)
-    """
-```
-
-It is like `map`, but do `map` for each elements in a batch in sequential manner.
-
-#### foreach_async
-
-```python
-class foreach_async(Stream):
-    """ 
-    Apply a function to every element in a tuple in the stream, in async manner.
-
-    Parameters
-    ----------
-    func: callable
-    *args :
-        The arguments to pass to the function.
-    **kwargs:
-        Keyword arguments to pass to func
-
-    Examples
-    --------
-    >>> source = Stream()
-    >>> source.foreach_async(lambda x: 2*x).sink(print)
-    >>> for i in range(3):
-    ...     source.emit((i, i))
-    (0, 0)
-    (2, 2)
-    (4, 4)
-    """
-```
-
-It is like `map`, but do `map` for each elements in a batch in async manner.
-
-Partial code can be like this,
-
-```python
-.map(function).partition(5).partition(5).foreach_async(wh.healing_batch, stream = source)
-```
-
-Example, [simple-plus-nested-batch.ipynb](example/simple-plus-nested-batch.ipynb)
-
-## checker
-
-#### check_leakage
-
-A decorator to check UUID leakage in before and after UUIDs.
-
-```python
-@check_leakage
-def func(rows):
-    # do something cause after uuid not same as before uuid
 ```
 
 ## Examples

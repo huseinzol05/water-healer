@@ -4,5 +4,6 @@ from .source import metrics
 from .core import *
 from .dask import *
 from . import checker
+from . import plugin
 
-__version__ = '0.0.29'
+__version__ = '0.0.30'
