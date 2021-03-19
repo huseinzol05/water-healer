@@ -8,6 +8,7 @@ import logging
 import os
 import time
 from waterhealer.function import topic_partition_str
+from apscheduler.schedulers.background import BackgroundScheduler
 
 last_updated = datetime.now()
 logger = logging.getLogger()
@@ -192,7 +193,6 @@ def auto_shutdown(
     interval: int = 5,
     sleep_before_shutdown: int = 120,
     client = None,
-    debug: bool = False,
 ):
     """
 
@@ -211,15 +211,19 @@ def auto_shutdown(
         sleep (second) before shutdown.
     client: object, (default=None)
         should be a dask client, will shutdown if client status not in ('running','closing','connecting','newly-created').
-    debug: bool, (default=False)
-        If True, will print logging.error if got any error.
     """
 
-    from apscheduler.schedulers.background import BackgroundScheduler
-
     scheduler = BackgroundScheduler()
-
     start_time = datetime.now()
+    if not client:
+        try:
+            from distributed.client import default_client
+
+            client = default_client()
+        except Exception as e:
+            logger.error(
+                'cannot retrieve client from `default_client`, make sure connected to dask or installed required dependencies.'
+            )
 
     def check_error():
         try:
@@ -231,10 +235,9 @@ def auto_shutdown(
                     and 'json_loads' not in key
                     and v.status == 'error'
                 ):
-                    if debug:
-                        logger.error(
-                            f'shutting down caused by exception. Started auto_shutdown {str(start_time)}, ended {str(datetime.now())}'
-                        )
+                    logger.error(
+                        f'shutting down caused by exception. Started auto_shutdown {str(start_time)}, ended {str(datetime.now())}'
+                    )
                     time.sleep(sleep_before_shutdown)
                     os._exit(1)
         except:
@@ -242,10 +245,9 @@ def auto_shutdown(
 
     def check_graceful():
         if (datetime.now() - last_updated).seconds > graceful:
-            if debug:
-                logger.error(
-                    f'shutting down caused by expired time. Started auto_shutdown {str(start_time)}, ended {str(datetime.now())}'
-                )
+            logger.error(
+                f'shutting down caused by expired time. Started auto_shutdown {str(start_time)}, ended {str(datetime.now())}'
+            )
             time.sleep(sleep_before_shutdown)
             os._exit(1)
 
@@ -257,10 +259,9 @@ def auto_shutdown(
                 'connecting',
                 'newly-created',
             ):
-                if debug:
-                    logger.error(
-                        f'shutting down caused by disconnected dask cluster. Started auto_shutdown {str(start_time)}, ended {str(datetime.now())}'
-                    )
+                logger.error(
+                    f'shutting down caused by disconnected dask cluster. Started auto_shutdown {str(start_time)}, ended {str(datetime.now())}'
+                )
                 time.sleep(sleep_before_shutdown)
                 os._exit(1)
         except:
