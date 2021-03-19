@@ -189,10 +189,11 @@ def healing_batch(
 def auto_shutdown(
     source,
     got_error: bool = True,
+    got_dask: bool = True,
     graceful: int = 1800,
     interval: int = 5,
-    sleep_before_shutdown: int = 120,
-    client = None,
+    sleep_before_shutdown: int = 15,
+    logging: bool = False,
 ):
     """
 
@@ -201,79 +202,94 @@ def auto_shutdown(
     source: source object
         async streamz source.
     got_error: bool, (default=True)
-        if streaming got an exception, automatically shutdown the script.
+        if dask streaming got an exception, automatically shutdown the script.
+    got_dask: bool, (default=True)
+        if True, will check Dask status, will shutdown if client status not in ('running','closing','connecting','newly-created').
     graceful: int, (default=1800)
         automatically shutdown the script if water-healer not updated any offsets after `graceful` period. 
         To off it, set it to 0.
     interval: int, (default=5)
         check heartbeat every `interval`. 
-    sleep_before_shutdown: int, (defaut=120)
+    sleep_before_shutdown: int, (defaut=15)
         sleep (second) before shutdown.
-    client: object, (default=None)
-        should be a dask client, will shutdown if client status not in ('running','closing','connecting','newly-created').
+    debug: bool, (default=False)
+        If True, will print logging.error if got any error.
     """
 
     scheduler = BackgroundScheduler()
     start_time = datetime.now()
-    if not client:
+
+    def get_client():
         try:
             from distributed.client import default_client
 
             client = default_client()
         except Exception as e:
-            logger.error(
-                'cannot retrieve client from `default_client`, make sure connected to dask or installed required dependencies.'
-            )
+            logger.error(str(e))
+            client = None
+        return client
 
     def check_error():
-        try:
-            for key, v in client.futures.copy().items():
-                if (
-                    'dict' not in key
-                    and 'str' not in key
-                    and 'byte' not in key
-                    and 'json_loads' not in key
-                    and v.status == 'error'
+        client = get_client()
+        if client:
+            try:
+                for key, v in client.futures.copy().items():
+                    if (
+                        'dict' not in key
+                        and 'str' not in key
+                        and 'byte' not in key
+                        and 'json_loads' not in key
+                        and v.status == 'error'
+                    ):
+                        if debug:
+                            logger.error(
+                                f'shutting down caused by exception. Started auto_shutdown {str(start_time)}, ended {str(datetime.now())}'
+                            )
+                        client.close()
+                        time.sleep(sleep_before_shutdown)
+                        os._exit(1)
+            except Exception as e:
+                print(e)
+
+    def check_dask():
+        client = get_client()
+        if client:
+            try:
+                if client.status not in (
+                    'running',
+                    'closing',
+                    'connecting',
+                    'newly-created',
                 ):
-                    logger.error(
-                        f'shutting down caused by exception. Started auto_shutdown {str(start_time)}, ended {str(datetime.now())}'
-                    )
+                    if debug:
+                        logger.error(
+                            f'shutting down caused by disconnected dask cluster. Started auto_shutdown {str(start_time)}, ended {str(datetime.now())}'
+                        )
+                    client.close()
                     time.sleep(sleep_before_shutdown)
                     os._exit(1)
-        except:
-            pass
+            except Exception as e:
+                print(e)
 
     def check_graceful():
         if (datetime.now() - last_updated).seconds > graceful:
-            logger.error(
-                f'shutting down caused by expired time. Started auto_shutdown {str(start_time)}, ended {str(datetime.now())}'
-            )
+            if debug:
+                logger.error(
+                    f'shutting down caused by expired time. Started auto_shutdown {str(start_time)}, ended {str(datetime.now())}'
+                )
+            client = get_client()
+            if client:
+                client.close()
             time.sleep(sleep_before_shutdown)
             os._exit(1)
-
-    def check_dask():
-        try:
-            if client.status not in (
-                'running',
-                'closing',
-                'connecting',
-                'newly-created',
-            ):
-                logger.error(
-                    f'shutting down caused by disconnected dask cluster. Started auto_shutdown {str(start_time)}, ended {str(datetime.now())}'
-                )
-                time.sleep(sleep_before_shutdown)
-                os._exit(1)
-        except:
-            pass
 
     if got_error:
         scheduler.add_job(check_error, 'interval', seconds = interval)
 
+    if got_dask:
+        scheduler.add_job(check_dask, 'interval', seconds = interval)
+
     if graceful:
         scheduler.add_job(check_graceful, 'interval', seconds = interval)
-
-    if client:
-        scheduler.add_job(check_dask, 'interval', seconds = interval)
 
     scheduler.start()

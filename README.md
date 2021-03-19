@@ -722,9 +722,10 @@ def metrics(
 def auto_shutdown(
     source,
     got_error: bool = True,
+    got_dask: bool = True,
     graceful: int = 1800,
-    interval: int = 1,
-    client = None,
+    interval: int = 5,
+    sleep_before_shutdown: int = 15,
 ):
     """
 
@@ -733,14 +734,16 @@ def auto_shutdown(
     source: source object
         async streamz source.
     got_error: bool, (default=True)
-        if streaming got an exception, automatically shutdown the script.
+        if dask streaming got an exception, automatically shutdown the script.
+    got_dask: bool, (default=True)
+        if True, will check Dask status, will shutdown if client status not in ('running','closing','connecting','newly-created').
     graceful: int, (default=1800)
         automatically shutdown the script if water-healer not updated any offsets after `graceful` period. 
         To off it, set it to 0.
-    interval: int, (default=1)
+    interval: int, (default=5)
         check heartbeat every `interval`. 
-    client: object, (default=None)
-        should be a dask client, will shutdown if client status not in ('running','closing','connecting','newly-created').
+    sleep_before_shutdown: int, (defaut=15)
+        sleep (second) before shutdown.
     """
 ```
 
