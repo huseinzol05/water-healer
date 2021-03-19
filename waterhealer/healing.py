@@ -193,7 +193,7 @@ def auto_shutdown(
     graceful: int = 1800,
     interval: int = 5,
     sleep_before_shutdown: int = 15,
-    logging: bool = False,
+    debug: bool = False,
 ):
     """
 

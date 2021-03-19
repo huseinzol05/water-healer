@@ -47,9 +47,9 @@ class from_kafka(Source):
         Whether to start polling upon instantiation
     debug: bool, (default=False)
         If True, will print topic, partition and offset for each polled message.
-    maxlen_memory: int, (default=10000)
+    maxlen_memory: int, (default=10_000_000)
         max length of topic and partition dictionary for healing process.
-    maxage_memory: int, (default=1800)
+    maxage_memory: int, (default=3600)
         max age for a partition stay in topic and partition dictionary.
     """
 
@@ -60,7 +60,7 @@ class from_kafka(Source):
         poll_interval = 0.1,
         start = False,
         debug = False,
-        maxlen_memory = 300_000,
+        maxlen_memory = 10_000_000,
         maxage_memory = 3600,
         **kwargs,
     ):

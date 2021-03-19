@@ -213,6 +213,7 @@ class Stream(object):
         self.name = stream_name
         self._checkpoint = checkpoint
         self.checkpoint = {}
+        self.error = False
 
     def _set_loop(self, loop):
         self.loop = None
@@ -474,11 +475,15 @@ class Stream(object):
 
         result = []
         for downstream in list(self.downstreams):
-            r = downstream.update(x, who = self)
-            if type(r) is list:
-                result.extend(r)
-            else:
-                result.append(r)
+            try:
+                r = downstream.update(x, who = self)
+                if type(r) is list:
+                    result.extend(r)
+                else:
+                    result.append(r)
+            except Exception as e:
+                self.error = True
+                raise
 
         return [element for element in result if element is not None]
 
