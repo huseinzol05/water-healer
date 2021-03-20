@@ -10,15 +10,43 @@ import time
 from waterhealer.function import topic_partition_str
 from apscheduler.schedulers.background import BackgroundScheduler
 
-last_updated = datetime.now()
+LAST_UPDATED = datetime.now()
+LAST_INTERVAL = datetime.now()
+PARTITIONS, COMMITS, REASONS = [], [], []
 logger = logging.getLogger()
 
 
 @gen.coroutine
-def _healing(row, consumer, memory, ignore, asynchronous):
-    global last_updated
+def _healing(
+    row, consumer, memory, ignore = False, asynchronous = True, interval = False
+):
+    global LAST_UPDATED, LAST_INTERVAL, PARTITIONS, COMMITS, REASONS
+
     if not consumer:
         raise Exception('consumer must not None')
+
+    def commit(partitions):
+        if len(partitions):
+            try:
+                consumer.commit(
+                    offsets = partitions, asynchronous = asynchronous
+                )
+                success = True
+                LAST_UPDATED = datetime.now()
+                reason = 'success'
+            except Exception as e:
+                success = False
+                if ignore:
+                    logging.warning(str(e))
+                    reason = str(e)
+                else:
+                    logger.exception(e)
+                    raise
+
+            return success, reason
+        else:
+            return False, 'length partitions is 0'
+
     success = False
     if not isinstance(row[0], dict):
         reason = 'invalid uuid'
@@ -29,7 +57,8 @@ def _healing(row, consumer, memory, ignore, asynchronous):
         partition = row[0].get('partition', '')
         offset = row[0].get('offset')
         topic = row[0].get('topic')
-        m = memory.get(topic_partition_str(topic, partition), [])
+        topic_partition = topic_partition_str(topic, partition)
+        m = memory.get(topic_partition, [])
 
         if partition is None or offset is None or topic is None:
             reason = 'invalid uuid'
@@ -41,54 +70,69 @@ def _healing(row, consumer, memory, ignore, asynchronous):
             m[offset] = True
             offsets = list(m.keys())
             offsets.sort()
-            if offsets.index(offset) == 0:
-                reasons, committed, successes = [], [], []
-                for offset in offsets:
-                    if m[offset]:
+
+            partitions, reasons, commits = [], [], []
+
+            if (offsets.index(offset) == 0 and interval == 0) or interval > 0:
+                while True:
+                    try:
                         low_offset, high_offset = consumer.get_watermark_offsets(
                             ck.TopicPartition(topic, partition)
                         )
                         current_offset = consumer.committed(
                             [ck.TopicPartition(topic, partition)]
                         )[0].offset
-                        reason = f'committed topic: {topic} partition: {partition} offset: {offset}'
-                        success = False
+                        break
+                    except Exception as e:
+                        print(e)
+
+                for o in offsets:
+                    if m[o]:
                         if current_offset >= high_offset:
                             reason = 'current offset already same as high offset, skip'
-                        elif offset < current_offset:
+                        elif o < current_offset:
                             reason = 'current offset higher than message offset, skip'
                         else:
-                            try:
-                                consumer.commit(
-                                    offsets = [
-                                        ck.TopicPartition(
-                                            topic, partition, offset + 1
-                                        )
-                                    ],
-                                    asynchronous = asynchronous,
-                                )
-                                success = True
-                                last_updated = datetime.now()
-                            except Exception as e:
-                                if ignore:
-                                    logging.warning(str(e))
-                                    reason = str(e)
-                                else:
-                                    logger.exception(e)
-                                    raise
-                        m.pop(offset)
+                            partitions.append(
+                                ck.TopicPartition(topic, partition, o + 1)
+                            )
+                            reason = f'committed topic: {topic} partition: {partition} offset: {o}'
                         reasons.append(reason)
-                        committed.append(offset)
-                        successes.append(success)
+                        commits.append((topic_partition, o))
                     else:
                         break
-                reason = reasons
-                offset = committed
-                success = successes
+
+            if interval > 0:
+                PARTITIONS.extend(partitions)
+                COMMITS.extend(commits)
+                REASONS.extend(reasons)
+
+                if (datetime.now() - LAST_INTERVAL).seconds > interval:
+                    LAST_INTERVAL = datetime.now()
+                    success, reason = commit(PARTITIONS)
+                    if success:
+                        reason = REASONS
+                        offset = COMMITS
+                        commits = COMMITS
+                else:
+                    reason = 'waiting for interval to update offsets'
+                    success = False
             else:
-                reason = (
-                    'current offset is not the smallest, waiting for smallest'
-                )
+                success, reason = commit(partitions)
+                if success:
+                    reason = reasons
+                    offset = commits
+                else:
+                    reason = 'current offset is not the smallest, waiting for smallest'
+                    success = False
+
+            if success:
+                for o in commits:
+                    topic_partition, o = o
+                    memory[topic_partition].pop(o)
+
+                if interval > 0:
+                    PARTITIONS, COMMITS, REASONS = [], [], []
 
     return {
         'data': row[1],
@@ -105,6 +149,7 @@ def healing(
     source: Callable = None,
     ignore: bool = False,
     asynchronous: bool = True,
+    interval: int = 10,
 ):
     """
 
@@ -118,7 +163,10 @@ def healing(
         if True, ignore any failed update offset.
     asynchronous: bool, (default=True)
         if True, it will update kafka offset async manner.
+    interval: int, (default=10)
+        Every interval, will update batch of kafka offsets. Set 0 to update every healing process.
     """
+
     if type(source) == streamz.dask.starmap:
         consumer = source.upstreams[0].upstreams[0].consumer
         memory = source.upstreams[0].upstreams[0].memory
@@ -134,7 +182,9 @@ def healing(
         memory = memory,
         ignore = ignore,
         asynchronous = asynchronous,
+        interval = interval,
     )
+
     return result.result()
 
 
@@ -276,7 +326,7 @@ def auto_shutdown(
                 print(e)
 
     def check_graceful():
-        if (datetime.now() - last_updated).seconds > graceful:
+        if (datetime.now() - LAST_UPDATED).seconds > graceful:
             if debug:
                 logger.error('shutting down caused by graceful timeout.')
             client = get_client()

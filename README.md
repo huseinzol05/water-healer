@@ -592,6 +592,7 @@ def healing(
     source: Callable = None,
     ignore: bool = False,
     asynchronous: bool = True,
+    interval: int = 10,
 ):
     """
 
@@ -605,6 +606,8 @@ def healing(
         if True, ignore any failed update offset.
     asynchronous: bool, (default=True)
         if True, it will update kafka offset async manner.
+    interval: int, (default=10)
+        Every interval, will update batch of kafka offsets. Set 0 to update every healing process.
     """
 ```
 
