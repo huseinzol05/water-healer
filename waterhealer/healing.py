@@ -193,7 +193,7 @@ def auto_shutdown(
     graceful: int = 1800,
     interval: int = 5,
     sleep_before_shutdown: int = 15,
-    debug: bool = False,
+    debug: bool = True,
 ):
     """
 
@@ -231,6 +231,7 @@ def auto_shutdown(
 
     def check_error():
         client = get_client()
+        error_dask = False
         if client:
             try:
                 for key, v in client.futures.copy().items():
@@ -241,15 +242,18 @@ def auto_shutdown(
                         and 'json_loads' not in key
                         and v.status == 'error'
                     ):
-                        if debug:
-                            logger.error(
-                                f'shutting down caused by exception. Started auto_shutdown {str(start_time)}, ended {str(datetime.now())}'
-                            )
                         client.close()
-                        time.sleep(sleep_before_shutdown)
-                        os._exit(1)
+                        error_dask = True
+                        break
+
             except Exception as e:
                 print(e)
+
+        if source.error or error_dask:
+            if debug:
+                logger.error('shutting down caused by exception.')
+            time.sleep(sleep_before_shutdown)
+            os._exit(1)
 
     def check_dask():
         client = get_client()
@@ -263,7 +267,7 @@ def auto_shutdown(
                 ):
                     if debug:
                         logger.error(
-                            f'shutting down caused by disconnected dask cluster. Started auto_shutdown {str(start_time)}, ended {str(datetime.now())}'
+                            'shutting down caused by disconnected dask cluster.'
                         )
                     client.close()
                     time.sleep(sleep_before_shutdown)
@@ -274,9 +278,7 @@ def auto_shutdown(
     def check_graceful():
         if (datetime.now() - last_updated).seconds > graceful:
             if debug:
-                logger.error(
-                    f'shutting down caused by expired time. Started auto_shutdown {str(start_time)}, ended {str(datetime.now())}'
-                )
+                logger.error('shutting down caused by graceful timeout.')
             client = get_client()
             if client:
                 client.close()

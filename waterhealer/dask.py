@@ -107,10 +107,14 @@ class scatter(DaskStream):
 
     @gen.coroutine
     def update(self, x, who = None):
-        client = default_client()
-        future = yield client.scatter(x, asynchronous = True)
-        f = yield self._emit(future)
-        raise gen.Return(f)
+        try:
+            client = default_client()
+            future = yield client.scatter(x, asynchronous = True)
+            f = yield self._emit(future)
+            raise gen.Return(f)
+        except Exception as e:
+            self.error = True
+            raise
 
 
 @DaskStream.register_api()
@@ -134,10 +138,14 @@ class gather(core.Stream):
 
     @gen.coroutine
     def update(self, x, who = None):
-        client = default_client()
-        result = yield client.gather(x, asynchronous = True)
-        result2 = yield self._emit(result)
-        raise gen.Return(result2)
+        try:
+            client = default_client()
+            result = yield client.gather(x, asynchronous = True)
+            result2 = yield self._emit(result)
+            raise gen.Return(result2)
+        except Exception as e:
+            self.error = True
+            raise
 
 
 @DaskStream.register_api()
