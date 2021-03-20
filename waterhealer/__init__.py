@@ -6,4 +6,4 @@ from .dask import *
 from . import checker
 from . import plugin
 
-__version__ = '0.0.39'
+__version__ = '0.0.40'

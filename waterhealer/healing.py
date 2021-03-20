@@ -104,7 +104,7 @@ def healing(
     row: Tuple,
     source: Callable = None,
     ignore: bool = False,
-    asynchronous: bool = False,
+    asynchronous: bool = True,
 ):
     """
 
@@ -116,7 +116,7 @@ def healing(
         waterhealer object to connect with kafka.
     ignore: bool, (default=False)
         if True, ignore any failed update offset.
-    asynchronous: bool, (default=False)
+    asynchronous: bool, (default=True)
         if True, it will update kafka offset async manner.
     """
     if type(source) == streamz.dask.starmap:
@@ -142,7 +142,7 @@ def healing_batch(
     rows: Tuple[Tuple],
     source: Callable = None,
     ignore: bool = False,
-    asynchronous: bool = False,
+    asynchronous: bool = True,
 ):
     """
 
@@ -154,7 +154,7 @@ def healing_batch(
         waterhealer object to connect with kafka.
     ignore: bool, (default=False)
         if True, ignore any failed update offset.
-    asynchronous: bool, (default=False)
+    asynchronous: bool, (default=True)
         if True, it will update kafka offset async manner.
     """
     if type(source) == streamz.dask.starmap:
