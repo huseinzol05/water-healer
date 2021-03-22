@@ -1,13 +1,13 @@
-from tornado import gen
 from waterhealer.core import Stream, convert_interval
+from tornado import gen
 from itertools import cycle
 from collections import defaultdict
 from expiringdict import ExpiringDict
 from apscheduler.schedulers.background import BackgroundScheduler
-import logging
-import confluent_kafka as ck
 from waterhealer.function import topic_partition_str
-
+import confluent_kafka as ck
+import logging
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +134,10 @@ class from_kafka(Source):
             consumer.unsubscribe()
             consumer.close()
         self.stopped = True
+
+    def stop(self, sleep_after_close = 5):
+        self._close_consumer()
+        time.sleep(sleep_after_close)
 
 
 class FromKafkaBatched(Stream):

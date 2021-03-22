@@ -292,7 +292,6 @@ def auto_shutdown(
                         and 'json_loads' not in key
                         and v.status == 'error'
                     ):
-                        client.close()
                         error_dask = True
                         break
 
@@ -302,6 +301,10 @@ def auto_shutdown(
         if source.error or error_dask:
             if debug:
                 logger.error('shutting down caused by exception.')
+            source.destroy()
+            source.stop()
+            if error_dask:
+                client.close()
             time.sleep(sleep_before_shutdown)
             os._exit(1)
 
@@ -319,6 +322,8 @@ def auto_shutdown(
                         logger.error(
                             'shutting down caused by disconnected dask cluster.'
                         )
+                    source.destroy()
+                    source.stop()
                     client.close()
                     time.sleep(sleep_before_shutdown)
                     os._exit(1)
@@ -329,19 +334,24 @@ def auto_shutdown(
         if (datetime.now() - LAST_UPDATED).seconds > graceful:
             if debug:
                 logger.error('shutting down caused by graceful timeout.')
+            source.destroy()
+            source.stop()
             client = get_client()
             if client:
                 client.close()
             time.sleep(sleep_before_shutdown)
             os._exit(1)
 
+    def check():
+        check_error()
+
+        if got_dask:
+            check_dask()
+
+        if graceful:
+            check_graceful()
+
     if got_error:
-        scheduler.add_job(check_error, 'interval', seconds = interval)
-
-    if got_dask:
-        scheduler.add_job(check_dask, 'interval', seconds = interval)
-
-    if graceful:
-        scheduler.add_job(check_graceful, 'interval', seconds = interval)
+        scheduler.add_job(check, 'interval', seconds = interval)
 
     scheduler.start()
