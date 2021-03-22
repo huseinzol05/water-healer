@@ -729,6 +729,7 @@ def auto_shutdown(
     graceful: int = 1800,
     interval: int = 5,
     sleep_before_shutdown: int = 15,
+    logging: bool = False,
 ):
     """
 
@@ -747,6 +748,8 @@ def auto_shutdown(
         check heartbeat every `interval`. 
     sleep_before_shutdown: int, (defaut=15)
         sleep (second) before shutdown.
+    logging: bool, (default=False)
+        If True, will print logging.error if got any error, else, print
     """
 ```
 

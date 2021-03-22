@@ -23,7 +23,14 @@ def _healing(
     global LAST_UPDATED, LAST_INTERVAL, PARTITIONS, COMMITS, REASONS
 
     if not consumer:
-        raise Exception('consumer must not None')
+        return {
+            'data': row[1],
+            'success': False,
+            'reason': 'consumer is None',
+            'partition': None,
+            'offset': None,
+            'topic': None,
+        }
 
     def commit(partitions):
         if len(partitions):
@@ -243,7 +250,7 @@ def auto_shutdown(
     graceful: int = 1800,
     interval: int = 5,
     sleep_before_shutdown: int = 15,
-    debug: bool = True,
+    logging: bool = False,
 ):
     """
 
@@ -262,8 +269,8 @@ def auto_shutdown(
         check heartbeat every `interval`. 
     sleep_before_shutdown: int, (defaut=15)
         sleep (second) before shutdown.
-    debug: bool, (default=False)
-        If True, will print logging.error if got any error.
+    logging: bool, (default=False)
+        If True, will print logging.error if got any error, else, print
     """
 
     scheduler = BackgroundScheduler()
@@ -275,9 +282,25 @@ def auto_shutdown(
 
             client = default_client()
         except Exception as e:
-            logger.error(str(e))
+            e = str(e)
+            if logging:
+                logger.error(e)
+            else:
+                print(e)
             client = None
         return client
+
+    def disconnect_client(client, timeout = 10):
+        try:
+            client.close(timeout = timeout)
+            return True
+        except Exception as e:
+            e = str(e)
+            if logging:
+                logger.error(e)
+            else:
+                print(e)
+            return False
 
     def check_error():
         client = get_client()
@@ -299,12 +322,14 @@ def auto_shutdown(
                 print(e)
 
         if source.error or error_dask:
-            if debug:
-                logger.error('shutting down caused by exception.')
-            source.destroy()
+            error = 'shutting down caused by exception.'
+            if logging:
+                logger.error(error)
+            else:
+                print(error)
             source.stop()
             if error_dask:
-                client.close()
+                disconnect_client(client)
             time.sleep(sleep_before_shutdown)
             os._exit(1)
 
@@ -318,13 +343,14 @@ def auto_shutdown(
                     'connecting',
                     'newly-created',
                 ):
-                    if debug:
-                        logger.error(
-                            'shutting down caused by disconnected dask cluster.'
-                        )
-                    source.destroy()
+                    error = 'shutting down caused by disconnected dask cluster.'
+                    if logging:
+                        logger.error(error)
+                    else:
+                        print(error)
+
                     source.stop()
-                    client.close()
+                    disconnect_client(client)
                     time.sleep(sleep_before_shutdown)
                     os._exit(1)
             except Exception as e:
@@ -332,13 +358,15 @@ def auto_shutdown(
 
     def check_graceful():
         if (datetime.now() - LAST_UPDATED).seconds > graceful:
-            if debug:
-                logger.error('shutting down caused by graceful timeout.')
-            source.destroy()
+            error = 'shutting down caused by graceful timeout.'
+            if logging:
+                logger.error(error)
+            else:
+                print(error)
             source.stop()
             client = get_client()
             if client:
-                client.close()
+                disconnect_client(client)
             time.sleep(sleep_before_shutdown)
             os._exit(1)
 
