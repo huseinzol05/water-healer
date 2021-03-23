@@ -276,19 +276,24 @@ def auto_shutdown(
     scheduler = BackgroundScheduler()
     start_time = datetime.now()
 
-    def get_client():
+    def get_client(return_exception = False):
+        error = 'no error'
         try:
             from distributed.client import default_client
 
             client = default_client()
         except Exception as e:
-            e = str(e)
+            error = str(e)
             if logging:
                 logger.error(e)
             else:
                 print(e)
             client = None
-        return client
+
+        if return_exception:
+            return client, error
+        else:
+            return client
 
     def disconnect_client(client, timeout = 10):
         try:
@@ -334,7 +339,8 @@ def auto_shutdown(
             os._exit(1)
 
     def check_dask():
-        client = get_client()
+        client, error = get_client(return_exception = True)
+        got_error, error_dask = False, False
         if client:
             try:
                 if client.status not in (
@@ -343,18 +349,26 @@ def auto_shutdown(
                     'connecting',
                     'newly-created',
                 ):
-                    error = 'shutting down caused by disconnected dask cluster.'
-                    if logging:
-                        logger.error(error)
-                    else:
-                        print(error)
-
-                    source.stop()
-                    disconnect_client(client)
-                    time.sleep(sleep_before_shutdown)
-                    os._exit(1)
+                    got_error = True
+                    error_dask = True
             except Exception as e:
                 print(e)
+
+        if 'No clients found' in error:
+            got_error = True
+
+        if got_error:
+            source.stop()
+            if error_dask:
+                disconnect_client(client)
+            error = 'shutting down caused by disconnected dask cluster.'
+            if logging:
+                logger.error(error)
+            else:
+                print(error)
+
+            time.sleep(sleep_before_shutdown)
+            os._exit(1)
 
     def check_graceful():
         if (datetime.now() - LAST_UPDATED).seconds > graceful:
