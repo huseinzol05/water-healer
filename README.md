@@ -508,7 +508,7 @@ class from_kafka(Source):
         If True, will print topic, partition and offset for each polled message.
     maxlen_memory: int, (default=10000)
         max length of topic and partition dictionary for healing process.
-    maxage_memory: int, (default=1800)
+    maxage_memory: int, (default=3600)
         max age for a partition stay in topic and partition dictionary.
     """
 ```
@@ -726,7 +726,7 @@ def auto_shutdown(
     source,
     got_error: bool = True,
     got_dask: bool = True,
-    graceful: int = 1800,
+    graceful: int = 3600,
     interval: int = 5,
     sleep_before_shutdown: int = 15,
     logging: bool = False,
@@ -741,7 +741,7 @@ def auto_shutdown(
         if dask streaming got an exception, automatically shutdown the script.
     got_dask: bool, (default=True)
         if True, will check Dask status, will shutdown if client status not in ('running','closing','connecting','newly-created').
-    graceful: int, (default=1800)
+    graceful: int, (default=3600)
         automatically shutdown the script if water-healer not updated any offsets after `graceful` period. 
         To off it, set it to 0.
     interval: int, (default=5)
