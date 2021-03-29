@@ -135,7 +135,7 @@ class from_kafka(Source):
             consumer.close()
         self.stopped = True
 
-    def stop(self, sleep_after_close = 5):
+    def stop(self, sleep_after_close = 2):
         self._close_consumer()
         time.sleep(sleep_after_close)
 

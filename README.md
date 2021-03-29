@@ -308,10 +308,10 @@ def inc(x):
 
 source = Stream()
 source.map(inc).sink(wh.healing, source = source)
-wh.auto_shutdown(source, graceful = 3600)
+wh.auto_shutdown(source, graceful = 5400)
 ```
 
-`wh.auto_shutdown(source, graceful = 3600)` will shutdown after 3600 seconds if no update offset after 3600 seconds. To disable it, simply `wh.auto_shutdown(source, graceful = 0)`.
+`wh.auto_shutdown(source, graceful = 5400)` will shutdown after 5400 seconds if no update offset after 5400 seconds. To disable it, simply `wh.auto_shutdown(source, graceful = 0)`.
 
 ### auto shutdown dask
 
@@ -319,7 +319,7 @@ When dask client disconnected with dask cluster, `wh.auto_shutdown` also can hel
 
 ```python
 client = Client()
-wh.auto_shutdown(source, graceful = 3600, client = client)
+wh.auto_shutdown(source, graceful = 5400, client = client)
 ```
 
 ### checkpointing
@@ -726,7 +726,7 @@ def auto_shutdown(
     source,
     got_error: bool = True,
     got_dask: bool = True,
-    graceful: int = 3600,
+    graceful: int = 5400,
     interval: int = 5,
     sleep_before_shutdown: int = 15,
     logging: bool = False,
@@ -741,7 +741,7 @@ def auto_shutdown(
         if dask streaming got an exception, automatically shutdown the script.
     got_dask: bool, (default=True)
         if True, will check Dask status, will shutdown if client status not in ('running','closing','connecting','newly-created').
-    graceful: int, (default=3600)
+    graceful: int, (default=5400)
         automatically shutdown the script if water-healer not updated any offsets after `graceful` period. 
         To off it, set it to 0.
     interval: int, (default=5)
