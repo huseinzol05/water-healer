@@ -226,7 +226,7 @@ class from_kafka_batched(Source):
             ):
                 L, self.buffer = self.buffer, []
                 last_push = datetime.now()
-                yield L
+                yield self._emit(L)
             if val:
                 partition = val.partition()
                 offset = val.offset()
