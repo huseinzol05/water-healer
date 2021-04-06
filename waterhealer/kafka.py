@@ -195,7 +195,9 @@ class from_kafka_batched(Source):
         self.batch_timeout = batch_timeout
         self.buffer = []
         self.poll_interval = poll_interval
-        super(from_kafka, self).__init__(ensure_io_loop = True, **kwargs)
+        super(from_kafka_batched, self).__init__(
+            ensure_io_loop = True, **kwargs
+        )
         self.stopped = True
         self.debug = debug
 
