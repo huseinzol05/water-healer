@@ -220,9 +220,9 @@ class from_kafka_batched(Source):
         last_push = datetime.now()
         while True:
             val = self.do_poll()
-            if (
-                len(self.buffer) == self.batch_size
-                or (datetime.now() - last_push).seconds > self.batch_timeout
+            if len(self.buffer) == self.batch_size or (
+                len(self.buffer) > 0
+                and (datetime.now() - last_push).seconds > self.batch_timeout
             ):
                 L, self.buffer = self.buffer, []
                 last_push = datetime.now()
