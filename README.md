@@ -536,16 +536,7 @@ If you want to use waterhealer, you need to make sure `uuid` from `from_kafka` s
 #### waterhealer.from_kafka_batched
 
 ```python
-def from_kafka_batched(
-    topics,
-    consumer_params,
-    poll_interval = '1s',
-    partitions = 5,
-    start = False,
-    dask = False,
-    maxlen = 1000,
-    **kwargs,
-):
+class from_kafka_batched(Source):
     """
 
     Parameters
@@ -561,18 +552,21 @@ def from_kafka_batched(
         Kafka;
         group.id, Identity of the consumer. If multiple sources share the same
         group, each message will be passed to only one of them.
+    batch_size: int
+        batch size of polling
+    batch_timeout: number
+        timeout for batching if not reach size `batch_size`
     poll_interval: number
         Seconds that elapse between polling Kafka for new messages
-    partitions: int, (default=5)
-        size of partitions to poll from kafka, this can be done parallel if `dask` is True.
     start: bool, (default=False)
         Whether to start polling upon instantiation
-    dask: bool, (default=False)
-        If True, partitions will poll in parallel manners.
-    maxlen: int, (default=1000)
-        max size of polling. sometime lag offset is really, so we don't to make any crash.
+    debug: bool, (default=False)
+        If True, will print topic, partition and offset for each polled message.
+    maxlen_memory: int, (default=10_000_000)
+        max length of topic and partition dictionary for healing process.
+    maxage_memory: int, (default=3600)
+        max age for a partition stay in topic and partition dictionary.
     """
-
 ```
 
 Same as `waterhealer.from_kafka`, but we pulled partitions in parallel manners.
