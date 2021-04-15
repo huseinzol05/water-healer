@@ -13,6 +13,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 LAST_UPDATED = datetime.now()
 LAST_INTERVAL = datetime.now()
 PARTITIONS, COMMITS, REASONS = [], [], []
+CONSUMER, MEMORY = None, None
 logger = logging.getLogger()
 
 
@@ -173,20 +174,32 @@ def healing(
     interval: int, (default=10)
         Every interval, will update batch of kafka offsets. Set 0 to update every healing process.
     """
+    global CONSUMER, MEMORY
 
-    if type(source) == streamz.dask.starmap:
-        consumer = source.upstreams[0].upstreams[0].consumer
-        memory = source.upstreams[0].upstreams[0].memory
-    elif type(source) == streamz.core.starmap:
-        consumer = source.upstreams[0].consumer
-        memory = source.upstreams[0].memory
-    else:
-        consumer = source.consumer
-        memory = source.memory
+    def get_memory(source, consumer, memory):
+
+        if hasattr(source, 'memory'):
+            return source, source.consumer, source.memory
+
+        for upstream in source.upstreams:
+            if hasattr(upstream, 'memory'):
+                return upstream, upstream.consumer, upstream.memory
+            else:
+                return upstream, None, None
+            source, consumer, memory = get_memory(source, consumer, memory)
+        return source, consumer, memory
+
+    if CONSUMER is None or MEMORY is None:
+
+        _, CONSUMER, MEMORY = get_memory(source, CONSUMER, MEMORY)
+
+    if CONSUMER is None or MEMORY is None:
+        raise Exception('memory or consumer is None')
+
     result = _healing(
         row = row,
-        consumer = consumer,
-        memory = memory,
+        consumer = CONSUMER,
+        memory = MEMORY,
         ignore = ignore,
         asynchronous = asynchronous,
         interval = interval,
@@ -214,23 +227,35 @@ def healing_batch(
     asynchronous: bool, (default=True)
         if True, it will update kafka offset async manner.
     """
-    if type(source) == streamz.dask.starmap:
-        consumer = source.upstreams[0].upstreams[0].consumer
-        memory = source.upstreams[0].upstreams[0].memory
-    elif type(source) == streamz.core.starmap:
-        consumer = source.upstreams[0].consumer
-        memory = source.upstreams[0].memory
-    else:
-        consumer = source.consumer
-        memory = source.memory
+    global CONSUMER, MEMORY
+
+    def get_memory(source, consumer, memory):
+
+        if hasattr(source, 'memory'):
+            return source, source.consumer, source.memory
+
+        for upstream in source.upstreams:
+            if hasattr(upstream, 'memory'):
+                return upstream, upstream.consumer, upstream.memory
+            else:
+                return upstream, None, None
+            source, consumer, memory = get_memory(source, consumer, memory)
+        return source, consumer, memory
+
+    if CONSUMER is None or MEMORY is None:
+
+        _, CONSUMER, MEMORY = get_memory(source, CONSUMER, MEMORY)
+
+    if CONSUMER is None or MEMORY is None:
+        raise Exception('memory or consumer is None')
 
     @gen.coroutine
     def loop():
         r = yield [
             _healing(
                 row = row,
-                consumer = consumer,
-                memory = memory,
+                consumer = CONSUMER,
+                memory = MEMORY,
                 ignore = ignore,
                 asynchronous = asynchronous,
             )

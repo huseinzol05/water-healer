@@ -6,7 +6,7 @@ __packagename__ = 'water-healer'
 setuptools.setup(
     name = __packagename__,
     packages = setuptools.find_packages(),
-    version = '0.0.56',
+    version = '0.0.57',
     python_requires = '>=3.7.*',
     description = 'Extension of Kafka Streamz to update consumer offset for successful sink',
     author = 'huseinzol05',

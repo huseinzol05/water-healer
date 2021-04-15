@@ -36,6 +36,7 @@ This library also added streaming metrics, auto-shutdown, auto-graceful, checkpo
     * [kafka](#kafka)
       * [waterhealer.from_kafka](#waterhealerfrom_kafka)
       * [waterhealer.from_kafka_batched](#waterhealerfrom_kafka_batched)
+      * [waterhealer.from_kafka_batched_scatter](#waterhealerfrom_kafka_batched_scatter)
     * [plugin](#plugin)
       * [waterhealer.plugin.error_logging](#waterhealerpluginerror_logging)
     * [source](#source)
@@ -572,6 +573,47 @@ class from_kafka_batched(Source):
 Same as `waterhealer.from_kafka`, but we pulled partitions in parallel manners.
 
 Example, [kafka-batch-dask-simple-plus-batch.ipynb](example/kafka-batch-dask-simple-plus-batch.ipynb)
+
+#### water.from_kafka_batched_scatter
+
+```python
+def from_kafka_batched_scatter(
+    topics,
+    consumer_params,
+    poll_interval = 10,
+    batch_size = 1000,
+    maxlen_memory = 10_000_000,
+    maxage_memory = 3600,
+    dask_bootstrap = None,
+    **kwargs,
+):
+    """
+
+    Parameters
+    ----------
+    topics: list of str
+        Labels of Kafka topics to consume from
+    consumer_params: dict
+        Settings to set up the stream, see
+        https://docs.confluent.io/current/clients/confluent-kafka-python/#configuration
+        https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
+        Examples:
+        bootstrap.servers, Connection string(s) (host:port) by which to reach
+        Kafka;
+        group.id, Identity of the consumer. If multiple sources share the same
+        group, each message will be passed to only one of them.
+    batch_size: int
+        batch size of polling
+    poll_interval: number
+        Seconds that elapse between polling Kafka for new messages
+    maxlen_memory: int, (default=10_000_000)
+        max length of topic and partition dictionary for healing process.
+    maxage_memory: int, (default=3600)
+        max age for a partition stay in topic and partition dictionary.
+    dask_bootstrap: str, (default=None)
+        dask bootstrap, will automatically scatter the offsets if provided the bootstrap.
+    """
+```
 
 ### healing
 
