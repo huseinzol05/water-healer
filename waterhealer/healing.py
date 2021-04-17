@@ -8,13 +8,23 @@ import logging
 import os
 import time
 from waterhealer.function import topic_partition_str
-from apscheduler.schedulers.background import BackgroundScheduler
 
 LAST_UPDATED = datetime.now()
 LAST_INTERVAL = datetime.now()
 PARTITIONS, COMMITS, REASONS = [], [], []
-CONSUMER, MEMORY = None, None
 logger = logging.getLogger()
+
+
+def get_memory(source, consumer = None, memory = None):
+
+    if hasattr(source, 'memory'):
+        return source, source.consumer, source.memory
+
+    for upstream in source.upstreams:
+        if hasattr(upstream, 'memory'):
+            return upstream, upstream.consumer, upstream.memory
+        return get_memory(upstream, consumer, memory)
+    return source, consumer, memory
 
 
 @gen.coroutine
@@ -174,32 +184,15 @@ def healing(
     interval: int, (default=10)
         Every interval, will update batch of kafka offsets. Set 0 to update every healing process.
     """
-    global CONSUMER, MEMORY
+    _, consumer, memory = get_memory(source)
 
-    def get_memory(source, consumer, memory):
-
-        if hasattr(source, 'memory'):
-            return source, source.consumer, source.memory
-
-        for upstream in source.upstreams:
-            if hasattr(upstream, 'memory'):
-                return upstream, upstream.consumer, upstream.memory
-            else:
-                return upstream, None, None
-            source, consumer, memory = get_memory(source, consumer, memory)
-        return source, consumer, memory
-
-    if CONSUMER is None or MEMORY is None:
-
-        _, CONSUMER, MEMORY = get_memory(source, CONSUMER, MEMORY)
-
-    if CONSUMER is None or MEMORY is None:
+    if consumer is None or memory is None:
         raise Exception('memory or consumer is None')
 
     result = _healing(
         row = row,
-        consumer = CONSUMER,
-        memory = MEMORY,
+        consumer = consumer,
+        memory = memory,
         ignore = ignore,
         asynchronous = asynchronous,
         interval = interval,
@@ -227,26 +220,10 @@ def healing_batch(
     asynchronous: bool, (default=True)
         if True, it will update kafka offset async manner.
     """
-    global CONSUMER, MEMORY
 
-    def get_memory(source, consumer, memory):
+    _, consumer, memory = get_memory(source)
 
-        if hasattr(source, 'memory'):
-            return source, source.consumer, source.memory
-
-        for upstream in source.upstreams:
-            if hasattr(upstream, 'memory'):
-                return upstream, upstream.consumer, upstream.memory
-            else:
-                return upstream, None, None
-            source, consumer, memory = get_memory(source, consumer, memory)
-        return source, consumer, memory
-
-    if CONSUMER is None or MEMORY is None:
-
-        _, CONSUMER, MEMORY = get_memory(source, CONSUMER, MEMORY)
-
-    if CONSUMER is None or MEMORY is None:
+    if consumer is None or memory is None:
         raise Exception('memory or consumer is None')
 
     @gen.coroutine
@@ -254,8 +231,8 @@ def healing_batch(
         r = yield [
             _healing(
                 row = row,
-                consumer = CONSUMER,
-                memory = MEMORY,
+                consumer = consumer,
+                memory = memory,
                 ignore = ignore,
                 asynchronous = asynchronous,
             )
@@ -272,10 +249,11 @@ def auto_shutdown(
     source,
     got_error: bool = True,
     got_dask: bool = True,
-    graceful: int = 5400,
+    graceful_offset: int = 3600,
+    graceful_polling: int = 600,
     interval: int = 5,
     sleep_before_shutdown: int = 2,
-    logging: bool = True,
+    logging: bool = False,
 ):
     """
 
@@ -287,18 +265,19 @@ def auto_shutdown(
         if dask streaming got an exception, automatically shutdown the script.
     got_dask: bool, (default=True)
         if True, will check Dask status, will shutdown if client status not in ('running','closing','connecting','newly-created').
-    graceful: int, (default=5400)
-        automatically shutdown the script if water-healer not updated any offsets after `graceful` period. 
+    graceful_offset: int, (default=3600)
+        automatically shutdown the script if water-healer not updated any offsets after `graceful_offset` period. 
+        To off it, set it to 0.
+    graceful_polling: int, (default=600)
+        automatically shutdown the script if kafka consumer not polling after `graceful_polling` period. 
         To off it, set it to 0.
     interval: int, (default=5)
         check heartbeat every `interval`. 
-    sleep_before_shutdown: int, (defaut=15)
+    sleep_before_shutdown: int, (defaut=2)
         sleep (second) before shutdown.
     logging: bool, (default=False)
         If True, will print logging.error if got any error, else, print
     """
-
-    scheduler = BackgroundScheduler()
     start_time = datetime.now()
 
     def get_client(return_exception = False):
@@ -395,9 +374,9 @@ def auto_shutdown(
             time.sleep(sleep_before_shutdown)
             os._exit(1)
 
-    def check_graceful():
-        if (datetime.now() - LAST_UPDATED).seconds > graceful:
-            error = 'shutting down caused by graceful timeout.'
+    def check_graceful_offset():
+        if (datetime.now() - LAST_UPDATED).seconds > graceful_offset:
+            error = 'shutting down caused by graceful offset timeout.'
             if logging:
                 logger.error(error)
             else:
@@ -409,16 +388,30 @@ def auto_shutdown(
             time.sleep(sleep_before_shutdown)
             os._exit(1)
 
-    def check():
+    def check_graceful_polling():
+        if (datetime.now() - source.last_poll).seconds > graceful_polling:
+            error = 'shutting down caused by graceful polling timeout.'
+            if logging:
+                logger.error(error)
+            else:
+                print(error)
+            source.stop()
+            client = get_client()
+            if client:
+                disconnect_client(client)
+            time.sleep(sleep_before_shutdown)
+            os._exit(1)
+
+    while True:
         check_error()
 
         if got_dask:
             check_dask()
 
-        if graceful:
-            check_graceful()
+        if graceful_offset:
+            check_graceful_offset()
 
-    if got_error:
-        scheduler.add_job(check, 'interval', seconds = interval)
+        if graceful_polling:
+            check_graceful_polling()
 
-    scheduler.start()
+        time.sleep(interval)

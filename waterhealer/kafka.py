@@ -88,7 +88,7 @@ class from_kafka(Source):
                 max_len = maxlen_memory, max_age_seconds = maxage_memory
             )
         )
-        self.consumer = None
+        self.last_poll = datetime.now()
 
     def do_poll(self):
         if self.consumer is not None:
@@ -118,6 +118,8 @@ class from_kafka(Source):
                 self.memory[topic_partition_str(topic, partition)][
                     offset
                 ] = False
+
+                self.last_poll = datetime.now()
                 yield self._emit((id_val, val))
             else:
                 yield gen.sleep(self.poll_interval)
@@ -213,7 +215,7 @@ class from_kafka_batched(Source):
                 max_len = maxlen_memory, max_age_seconds = maxage_memory
             )
         )
-        self.consumer = None
+        self.last_poll = datetime.now()
 
     def do_poll(self):
         if self.consumer is not None:
@@ -232,6 +234,7 @@ class from_kafka_batched(Source):
             ):
                 L, self.buffer = self.buffer, []
                 last_push = datetime.now()
+                self.last_poll = datetime.now()
                 yield self._emit(L)
             if val:
                 partition = val.partition()
@@ -296,6 +299,7 @@ class FromKafkaBatched(Source):
         self.topics = topics
         self.poll_interval = poll_interval
         self.batch_size = batch_size
+        self.consumer = None
         self.started = False
 
         self.memory = defaultdict(
@@ -482,7 +486,6 @@ def from_kafka_batched_scatter(
         dask bootstrap, will automatically scatter the offsets if provided the bootstrap.
     """
     consumer_params['enable.auto.commit'] = False
-    kwargs['loop'] = get_io_loop()
     source = FromKafkaBatched(
         topics = topics,
         consumer_params = consumer_params,

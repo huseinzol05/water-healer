@@ -762,9 +762,10 @@ def auto_shutdown(
     source,
     got_error: bool = True,
     got_dask: bool = True,
-    graceful: int = 5400,
+    graceful_offset: int = 3600,
+    graceful_polling: int = 600,
     interval: int = 5,
-    sleep_before_shutdown: int = 15,
+    sleep_before_shutdown: int = 2,
     logging: bool = False,
 ):
     """
@@ -777,12 +778,15 @@ def auto_shutdown(
         if dask streaming got an exception, automatically shutdown the script.
     got_dask: bool, (default=True)
         if True, will check Dask status, will shutdown if client status not in ('running','closing','connecting','newly-created').
-    graceful: int, (default=5400)
-        automatically shutdown the script if water-healer not updated any offsets after `graceful` period. 
+    graceful_offset: int, (default=3600)
+        automatically shutdown the script if water-healer not updated any offsets after `graceful_offset` period. 
+        To off it, set it to 0.
+    graceful_polling: int, (default=600)
+        automatically shutdown the script if kafka consumer not polling after `graceful_polling` period. 
         To off it, set it to 0.
     interval: int, (default=5)
         check heartbeat every `interval`. 
-    sleep_before_shutdown: int, (defaut=15)
+    sleep_before_shutdown: int, (defaut=2)
         sleep (second) before shutdown.
     logging: bool, (default=False)
         If True, will print logging.error if got any error, else, print
