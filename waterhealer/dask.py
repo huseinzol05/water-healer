@@ -109,7 +109,10 @@ class scatter(DaskStream):
     def update(self, x, who = None):
         try:
             client = default_client()
-            future = yield client.scatter(x, asynchronous = True)
+            future_as_list = yield client.scatter(
+                [x], asynchronous = True, hash = False
+            )
+            future = future_as_list[0]
             f = yield self._emit(future)
             raise gen.Return(f)
         except Exception as e:

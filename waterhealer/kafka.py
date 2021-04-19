@@ -3,7 +3,6 @@ from tornado import gen
 from itertools import cycle
 from collections import defaultdict
 from expiringdict import ExpiringDict
-from apscheduler.schedulers.background import BackgroundScheduler
 from waterhealer.function import topic_partition_str
 from datetime import datetime
 import confluent_kafka as ck
@@ -296,20 +295,20 @@ class FromKafkaBatched(Source):
         **kwargs,
     ):
         self.consumer_params = consumer_params
+        self.consumer_params['enable.auto.commit'] = False
+        self.consumer = None
         self.topics = topics
         self.poll_interval = poll_interval
         self.batch_size = batch_size
-        self.consumer = None
-        self.started = False
+        super(FromKafkaBatched, self).__init__(ensure_io_loop = True, **kwargs)
+        self.stopped = True
 
         self.memory = defaultdict(
             lambda: ExpiringDict(
                 max_len = maxlen_memory, max_age_seconds = maxage_memory
             )
         )
-        self.consumer = None
-
-        super(FromKafkaBatched, self).__init__(ensure_io_loop = True, **kwargs)
+        self.last_poll = datetime.now()
 
     @gen.coroutine
     def poll_kafka(self):
@@ -386,10 +385,10 @@ class FromKafkaBatched(Source):
                     self.memory[topic_partition_str(part[1], part[2])][
                         offset
                     ] = False
+                self.last_poll = datetime.now()
                 yield self._emit(part)
 
-            else:
-                yield gen.sleep(self.poll_interval)
+            yield gen.sleep(self.poll_interval)
 
     def start(self):
         import confluent_kafka as ck
@@ -456,7 +455,7 @@ def from_kafka_batched_scatter(
     batch_size = 1000,
     maxlen_memory = 10_000_000,
     maxage_memory = 3600,
-    dask_bootstrap = None,
+    dask = False,
     **kwargs,
 ):
     """
@@ -485,7 +484,10 @@ def from_kafka_batched_scatter(
     dask_bootstrap: str, (default=None)
         dask bootstrap, will automatically scatter the offsets if provided the bootstrap.
     """
-    consumer_params['enable.auto.commit'] = False
+    if dask:
+        from distributed.client import default_client
+
+        kwargs['loop'] = default_client().loop
     source = FromKafkaBatched(
         topics = topics,
         consumer_params = consumer_params,
@@ -495,10 +497,8 @@ def from_kafka_batched_scatter(
         maxage_memory = maxage_memory,
         **kwargs,
     )
-    if dask_bootstrap:
-        from dask.distributed import Client
 
-        client = Client(dask_bootstrap, loop = source.loop)
+    if dask:
         source = source.scatter()
 
     return source.starmap(get_message_batch)

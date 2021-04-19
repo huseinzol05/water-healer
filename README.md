@@ -584,7 +584,7 @@ def from_kafka_batched_scatter(
     batch_size = 1000,
     maxlen_memory = 10_000_000,
     maxage_memory = 3600,
-    dask_bootstrap = None,
+    dask = False,
     **kwargs,
 ):
     """
@@ -763,7 +763,7 @@ def auto_shutdown(
     got_error: bool = True,
     got_dask: bool = True,
     graceful_offset: int = 3600,
-    graceful_polling: int = 600,
+    graceful_polling: int = 1800,
     interval: int = 5,
     sleep_before_shutdown: int = 2,
     logging: bool = False,
@@ -781,7 +781,7 @@ def auto_shutdown(
     graceful_offset: int, (default=3600)
         automatically shutdown the script if water-healer not updated any offsets after `graceful_offset` period. 
         To off it, set it to 0.
-    graceful_polling: int, (default=600)
+    graceful_polling: int, (default=1800)
         automatically shutdown the script if kafka consumer not polling after `graceful_polling` period. 
         To off it, set it to 0.
     interval: int, (default=5)

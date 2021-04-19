@@ -54,6 +54,11 @@ try:
 except ImportError:
     PollIOLoop = None  # dropped in tornado 6.0
 
+try:
+    from distributed.client import default_client as _dask_default_client
+except ImportError:  # pragma: no cover
+    _dask_default_client = None
+
 from collections import Iterable
 
 from streamz.compatibility import get_thread_identity
@@ -85,6 +90,15 @@ DISABLE_CHECKPOINTING = to_bool(os.environ.get('DISABLE_CHECKPOINTING', False))
 def get_io_loop(asynchronous = None):
     if asynchronous:
         return IOLoop.current()
+
+    if _dask_default_client is not None:
+        try:
+            client = _dask_default_client()
+        except ValueError:
+            # No dask client found; continue
+            pass
+        else:
+            return client.loop
 
     if not _io_loops:
         loop = IOLoop()

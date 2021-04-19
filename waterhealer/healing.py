@@ -27,6 +27,28 @@ def get_memory(source, consumer = None, memory = None):
     return source, consumer, memory
 
 
+def get_error(source, error = None, last_poll = None):
+    if hasattr(source, 'last_poll'):
+        return source, source.error, source.last_poll
+
+    for upstream in source.upstreams:
+        if hasattr(upstream, 'last_poll'):
+            return upstream, upstream.error, upstream.last_poll
+        return get_error(upstream, error, last_poll)
+    return source, error, last_poll
+
+
+def get_source(source):
+    if hasattr(source, 'stop'):
+        return source
+
+    for upstream in source.upstreams:
+        if hasattr(upstream, 'stop'):
+            return upstream
+        return get_source(upstream)
+    return source
+
+
 @gen.coroutine
 def _healing(
     row, consumer, memory, ignore = False, asynchronous = True, interval = False
@@ -250,7 +272,7 @@ def auto_shutdown(
     got_error: bool = True,
     got_dask: bool = True,
     graceful_offset: int = 3600,
-    graceful_polling: int = 600,
+    graceful_polling: int = 1800,
     interval: int = 5,
     sleep_before_shutdown: int = 2,
     logging: bool = False,
@@ -268,7 +290,7 @@ def auto_shutdown(
     graceful_offset: int, (default=3600)
         automatically shutdown the script if water-healer not updated any offsets after `graceful_offset` period. 
         To off it, set it to 0.
-    graceful_polling: int, (default=600)
+    graceful_polling: int, (default=1800)
         automatically shutdown the script if kafka consumer not polling after `graceful_polling` period. 
         To off it, set it to 0.
     interval: int, (default=5)
@@ -330,13 +352,15 @@ def auto_shutdown(
             except Exception as e:
                 print(e)
 
-        if source.error or error_dask:
+        source_ = get_source(source)
+
+        if source_.error or error_dask:
             error = 'shutting down caused by exception.'
             if logging:
                 logger.error(error)
             else:
                 print(error)
-            source.stop()
+            source_.stop()
             if error_dask:
                 disconnect_client(client)
             time.sleep(sleep_before_shutdown)
@@ -362,7 +386,8 @@ def auto_shutdown(
             got_error = True
 
         if got_error:
-            source.stop()
+            source_ = get_source(source)
+            source_.stop()
             if error_dask:
                 disconnect_client(client)
             error = 'shutting down caused by disconnected dask cluster.'
@@ -381,7 +406,9 @@ def auto_shutdown(
                 logger.error(error)
             else:
                 print(error)
-            source.stop()
+
+            source_ = get_source(source)
+            source_.stop()
             client = get_client()
             if client:
                 disconnect_client(client)
@@ -389,13 +416,15 @@ def auto_shutdown(
             os._exit(1)
 
     def check_graceful_polling():
-        if (datetime.now() - source.last_poll).seconds > graceful_polling:
+
+        source_ = get_source(source)
+        if (datetime.now() - source_.last_poll).seconds > graceful_polling:
             error = 'shutting down caused by graceful polling timeout.'
             if logging:
                 logger.error(error)
             else:
                 print(error)
-            source.stop()
+            source_.stop()
             client = get_client()
             if client:
                 disconnect_client(client)
