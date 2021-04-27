@@ -580,7 +580,7 @@ Example, [kafka-batch-dask-simple-plus-batch.ipynb](example/kafka-batch-dask-sim
 def from_kafka_batched_scatter(
     topics,
     consumer_params,
-    poll_interval = 10,
+    poll_interval = 5,
     batch_size = 1000,
     maxlen_memory = 10_000_000,
     maxage_memory = 3600,
