@@ -766,6 +766,7 @@ def auto_shutdown(
     graceful_polling: int = 1800,
     interval: int = 5,
     sleep_before_shutdown: int = 2,
+    auto_expired: int = 5400,
     logging: bool = False,
 ):
     """
@@ -788,6 +789,8 @@ def auto_shutdown(
         check heartbeat every `interval`. 
     sleep_before_shutdown: int, (defaut=2)
         sleep (second) before shutdown.
+    auto_expired: int, (default=5400)
+        auto shutdown after `auto_expired`. Set to `0` to disable it.
     logging: bool, (default=False)
         If True, will print logging.error if got any error, else, print
     """
