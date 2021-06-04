@@ -4,15 +4,15 @@ import setuptools
 __packagename__ = 'water-healer'
 
 setuptools.setup(
-    name = __packagename__,
-    packages = setuptools.find_packages(),
-    version = '0.0.62',
-    python_requires = '>=3.7.*',
-    description = 'Extension of Kafka Streamz to update consumer offset for successful sink',
-    author = 'huseinzol05',
-    author_email = 'husein.zol05@gmail.com',
-    url = 'https://github.com/huseinzol05/water-healer',
-    install_requires = [
+    name=__packagename__,
+    packages=setuptools.find_packages(),
+    version='0.0.63',
+    python_requires='>=3.7.*',
+    description='Extension of Kafka Streamz to update consumer offset for successful sink',
+    author='huseinzol05',
+    author_email='husein.zol05@gmail.com',
+    url='https://github.com/huseinzol05/water-healer',
+    install_requires=[
         'streamz==0.5.2',
         'tornado',
         'expiringdict',
@@ -22,8 +22,8 @@ setuptools.setup(
         'networkx==2.3',
         'graphviz',
     ],
-    license = 'MIT',
-    classifiers = [
+    license='MIT',
+    classifiers=[
         'Programming Language :: Python :: 3.7',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',

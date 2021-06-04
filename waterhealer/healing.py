@@ -15,7 +15,7 @@ PARTITIONS, COMMITS, REASONS = [], [], []
 logger = logging.getLogger()
 
 
-def get_memory(source, consumer = None, memory = None):
+def get_memory(source, consumer=None, memory=None):
 
     if hasattr(source, 'memory'):
         return source, source.consumer, source.memory
@@ -27,7 +27,7 @@ def get_memory(source, consumer = None, memory = None):
     return source, consumer, memory
 
 
-def get_error(source, error = None, last_poll = None):
+def get_error(source, error=None, last_poll=None):
     if hasattr(source, 'last_poll'):
         return source, source.error, source.last_poll
 
@@ -51,7 +51,7 @@ def get_source(source):
 
 @gen.coroutine
 def _healing(
-    row, consumer, memory, ignore = False, asynchronous = True, interval = False
+    row, consumer, memory, ignore=False, asynchronous=True, interval=False
 ):
     global LAST_UPDATED, LAST_INTERVAL, PARTITIONS, COMMITS, REASONS
 
@@ -69,7 +69,7 @@ def _healing(
         if len(partitions):
             try:
                 consumer.commit(
-                    offsets = partitions, asynchronous = asynchronous
+                    offsets=partitions, asynchronous=asynchronous
                 )
                 success = True
                 LAST_UPDATED = datetime.now()
@@ -212,12 +212,12 @@ def healing(
         raise Exception('memory or consumer is None')
 
     result = _healing(
-        row = row,
-        consumer = consumer,
-        memory = memory,
-        ignore = ignore,
-        asynchronous = asynchronous,
-        interval = interval,
+        row=row,
+        consumer=consumer,
+        memory=memory,
+        ignore=ignore,
+        asynchronous=asynchronous,
+        interval=interval,
     )
 
     return result.result()
@@ -252,11 +252,11 @@ def healing_batch(
     def loop():
         r = yield [
             _healing(
-                row = row,
-                consumer = consumer,
-                memory = memory,
-                ignore = ignore,
-                asynchronous = asynchronous,
+                row=row,
+                consumer=consumer,
+                memory=memory,
+                ignore=ignore,
+                asynchronous=asynchronous,
             )
             for row in rows
         ]
@@ -275,7 +275,7 @@ def auto_shutdown(
     graceful_polling: int = 1800,
     interval: int = 5,
     sleep_before_shutdown: int = 2,
-    auto_expired: int = 5400,
+    auto_expired: int = 10800,
     logging: bool = False,
 ):
     """
@@ -298,14 +298,14 @@ def auto_shutdown(
         check heartbeat every `interval`. 
     sleep_before_shutdown: int, (defaut=2)
         sleep (second) before shutdown.
-    auto_expired: int, (default=5400)
+    auto_expired: int, (default=10800)
         auto shutdown after `auto_expired`. Set to `0` to disable it.
     logging: bool, (default=False)
         If True, will print logging.error if got any error, else, print
     """
     start_time = datetime.now()
 
-    def get_client(return_exception = False):
+    def get_client(return_exception=False):
         error = 'no error'
         try:
             from distributed.client import default_client
@@ -324,9 +324,9 @@ def auto_shutdown(
         else:
             return client
 
-    def disconnect_client(client, timeout = 10):
+    def disconnect_client(client, timeout=10):
         try:
-            client.close(timeout = timeout)
+            client.close(timeout=timeout)
             return True
         except Exception as e:
             e = str(e)
@@ -370,7 +370,7 @@ def auto_shutdown(
             os._exit(1)
 
     def check_dask():
-        client, error = get_client(return_exception = True)
+        client, error = get_client(return_exception=True)
         got_error, error_dask = False, False
         if client:
             try:

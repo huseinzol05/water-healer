@@ -33,11 +33,11 @@ def error_logging(client, persistent, name: str = 'worker-plugin'):
                 for k in self.worker.dependencies[key]:
                     try:
                         data[k] = self.worker.data[k]
-                    except:
+                    except BaseException:
                         pass
 
-                args2 = pack_data(args, data, key_types = (bytes, str))
-                kwargs2 = pack_data(kwargs, data, key_types = (bytes, str))
+                args2 = pack_data(args, data, key_types=(bytes, str))
+                kwargs2 = pack_data(kwargs, data, key_types=(bytes, str))
 
                 data = {
                     'function': func_name,
@@ -53,11 +53,11 @@ def error_logging(client, persistent, name: str = 'worker-plugin'):
 
                 self.persist(data, datetime.now())
 
-    async def register_worker_plugin(plugin, name = None):
+    async def register_worker_plugin(plugin, name=None):
         responses = await client.scheduler.broadcast(
-            msg = dict(op = 'plugin-add', plugin = dumps(plugin), name = name)
+            msg=dict(op='plugin-add', plugin=dumps(plugin), name=name)
         )
         return responses
 
     plugin = ErrorLogger()
-    client.sync(register_worker_plugin, plugin = plugin, name = name)
+    client.sync(register_worker_plugin, plugin=plugin, name=name)

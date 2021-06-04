@@ -47,17 +47,17 @@ class DaskStream(Stream):
 
 @DaskStream.register_api()
 class map(DaskStream):
-    def __init__(self, upstream, func, checkpoint = False, *args, **kwargs):
+    def __init__(self, upstream, func, checkpoint=False, *args, **kwargs):
         self.func = func
         self.kwargs = kwargs
         self.args = args
 
-        DaskStream.__init__(self, upstream, checkpoint = checkpoint)
+        DaskStream.__init__(self, upstream, checkpoint=checkpoint)
 
-    def update(self, x, who = None):
+    def update(self, x, who=None):
         client = default_client()
         result = client.submit(
-            self.func, x, *self.args, **self.kwargs, pure = False
+            self.func, x, *self.args, **self.kwargs, pure=False
         )
         return self._emit(result)
 
@@ -68,29 +68,29 @@ class accumulate(DaskStream):
         self,
         upstream,
         func,
-        start = core.no_default,
-        checkpoint = False,
-        returns_state = False,
+        start=core.no_default,
+        checkpoint=False,
+        returns_state=False,
         **kwargs
     ):
         self.func = func
         self.state = start
         self.returns_state = returns_state
         self.kwargs = kwargs
-        DaskStream.__init__(self, upstream, checkpoint = checkpoint)
+        DaskStream.__init__(self, upstream, checkpoint=checkpoint)
 
-    def update(self, x, who = None):
+    def update(self, x, who=None):
         if self.state is core.no_default:
             self.state = x
             return self._emit(self.state)
         else:
             client = default_client()
             result = client.submit(
-                self.func, self.state, x, **self.kwargs, pure = False
+                self.func, self.state, x, **self.kwargs, pure=False
             )
             if self.returns_state:
-                state = client.submit(getitem, result, 0, pure = False)
-                result = client.submit(getitem, result, 1, pure = False)
+                state = client.submit(getitem, result, 0, pure=False)
+                result = client.submit(getitem, result, 1, pure=False)
             else:
                 state = result
             self.state = state
@@ -106,11 +106,11 @@ class scatter(DaskStream):
     """
 
     @gen.coroutine
-    def update(self, x, who = None):
+    def update(self, x, who=None):
         try:
             client = default_client()
             future_as_list = yield client.scatter(
-                [x], asynchronous = True, hash = False
+                [x], asynchronous=True, hash=False
             )
             future = future_as_list[0]
             f = yield self._emit(future)
@@ -140,10 +140,10 @@ class gather(core.Stream):
     """
 
     @gen.coroutine
-    def update(self, x, who = None):
+    def update(self, x, who=None):
         try:
             client = default_client()
-            result = yield client.gather(x, asynchronous = True)
+            result = yield client.gather(x, asynchronous=True)
             result2 = yield self._emit(result)
             raise gen.Return(result2)
         except Exception as e:
@@ -153,18 +153,18 @@ class gather(core.Stream):
 
 @DaskStream.register_api()
 class starmap(DaskStream):
-    def __init__(self, upstream, func, checkpoint = False, **kwargs):
+    def __init__(self, upstream, func, checkpoint=False, **kwargs):
         self.func = func
         stream_name = kwargs.pop('stream_name', None)
         self.kwargs = kwargs
 
         DaskStream.__init__(
-            self, upstream, stream_name = stream_name, checkpoint = checkpoint
+            self, upstream, stream_name=stream_name, checkpoint=checkpoint
         )
 
-    def update(self, x, who = None):
+    def update(self, x, who=None):
         client = default_client()
-        result = client.submit(apply, self.func, x, self.kwargs, pure = False)
+        result = client.submit(apply, self.func, x, self.kwargs, pure=False)
         return self._emit(result)
 
 

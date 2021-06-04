@@ -64,11 +64,11 @@ class from_kafka(Source):
         self,
         topics,
         consumer_params,
-        poll_interval = 0.1,
-        start = False,
-        debug = False,
-        maxlen_memory = 10_000_000,
-        maxage_memory = 3600,
+        poll_interval=0.1,
+        start=False,
+        debug=False,
+        maxlen_memory=10_000_000,
+        maxage_memory=3600,
         **kwargs,
     ):
         self.cpars = consumer_params
@@ -76,7 +76,7 @@ class from_kafka(Source):
         self.consumer = None
         self.topics = topics
         self.poll_interval = poll_interval
-        super(from_kafka, self).__init__(ensure_io_loop = True, **kwargs)
+        super(from_kafka, self).__init__(ensure_io_loop=True, **kwargs)
         self.stopped = True
         self.debug = debug
 
@@ -84,7 +84,7 @@ class from_kafka(Source):
             self.start()
         self.memory = defaultdict(
             lambda: ExpiringDict(
-                max_len = maxlen_memory, max_age_seconds = maxage_memory
+                max_len=maxlen_memory, max_age_seconds=maxage_memory
             )
         )
         self.last_poll = datetime.now()
@@ -142,7 +142,7 @@ class from_kafka(Source):
             _close_consumer(self.consumer)
         self.stopped = True
 
-    def stop(self, sleep_after_close = 2):
+    def stop(self, sleep_after_close=2):
         self._close_consumer()
         time.sleep(sleep_after_close)
 
@@ -184,13 +184,13 @@ class from_kafka_batched(Source):
         self,
         topics,
         consumer_params,
-        batch_size = 100,
-        batch_timeout = 10,
-        poll_interval = 0.1,
-        start = False,
-        debug = False,
-        maxlen_memory = 10_000_000,
-        maxage_memory = 3600,
+        batch_size=100,
+        batch_timeout=10,
+        poll_interval=0.1,
+        start=False,
+        debug=False,
+        maxlen_memory=10_000_000,
+        maxage_memory=3600,
         **kwargs,
     ):
         self.cpars = consumer_params
@@ -202,7 +202,7 @@ class from_kafka_batched(Source):
         self.buffer = []
         self.poll_interval = poll_interval
         super(from_kafka_batched, self).__init__(
-            ensure_io_loop = True, **kwargs
+            ensure_io_loop=True, **kwargs
         )
         self.stopped = True
         self.debug = debug
@@ -211,7 +211,7 @@ class from_kafka_batched(Source):
             self.start()
         self.memory = defaultdict(
             lambda: ExpiringDict(
-                max_len = maxlen_memory, max_age_seconds = maxage_memory
+                max_len=maxlen_memory, max_age_seconds=maxage_memory
             )
         )
         self.last_poll = datetime.now()
@@ -276,7 +276,7 @@ class from_kafka_batched(Source):
             _close_consumer(self.consumer)
         self.stopped = True
 
-    def stop(self, sleep_after_close = 2):
+    def stop(self, sleep_after_close=2):
         self._close_consumer()
         time.sleep(sleep_after_close)
 
@@ -288,10 +288,10 @@ class FromKafkaBatched(Source):
         self,
         topics,
         consumer_params,
-        poll_interval = 10,
-        batch_size = 1000,
-        maxlen_memory = 10_000_000,
-        maxage_memory = 3600,
+        poll_interval=10,
+        batch_size=1000,
+        maxlen_memory=10_000_000,
+        maxage_memory=3600,
         **kwargs,
     ):
         self.consumer_params = consumer_params
@@ -300,12 +300,12 @@ class FromKafkaBatched(Source):
         self.topics = topics
         self.poll_interval = poll_interval
         self.batch_size = batch_size
-        super(FromKafkaBatched, self).__init__(ensure_io_loop = True, **kwargs)
+        super(FromKafkaBatched, self).__init__(ensure_io_loop=True, **kwargs)
         self.stopped = True
 
         self.memory = defaultdict(
             lambda: ExpiringDict(
-                max_len = maxlen_memory, max_age_seconds = maxage_memory
+                max_len=maxlen_memory, max_age_seconds=maxage_memory
             )
         )
         self.last_poll = datetime.now()
@@ -317,7 +317,7 @@ class FromKafkaBatched(Source):
         def commit(_part):
             topic, part_no, _, _, offset = _part[1:]
             _tp = ck.TopicPartition(topic, part_no, offset + 1)
-            self.consumer.commit(offsets = [_tp], asynchronous = True)
+            self.consumer.commit(offsets=[_tp], asynchronous=True)
 
         self.npartitions, self.positions = [], []
         for topic in self.topics:
@@ -336,7 +336,7 @@ class FromKafkaBatched(Source):
         for no, topic in enumerate(self.topics):
             while True:
                 try:
-                    committed = self.consumer.committed(tps[no], timeout = 1)
+                    committed = self.consumer.committed(tps[no], timeout=1)
                 except ck.KafkaException:
                     pass
                 else:
@@ -352,7 +352,7 @@ class FromKafkaBatched(Source):
                     tp = ck.TopicPartition(topic, partition, 0)
                     try:
                         low, high = self.consumer.get_watermark_offsets(
-                            tp, timeout = 0.1
+                            tp, timeout=0.1
                         )
                     except (RuntimeError, ck.KafkaException):
                         continue
@@ -406,13 +406,13 @@ class FromKafkaBatched(Source):
             _close_consumer(self.consumer)
         self.stopped = True
 
-    def stop(self, sleep_after_close = 2):
+    def stop(self, sleep_after_close=2):
         self._close_consumer()
         time.sleep(sleep_after_close)
 
 
 def get_message_batch(
-    kafka_params, topic, partition, low, high, timeout = None
+    kafka_params, topic, partition, low, high, timeout=None
 ):
     import confluent_kafka as ck
 
@@ -451,11 +451,11 @@ def get_message_batch(
 def from_kafka_batched_scatter(
     topics,
     consumer_params,
-    poll_interval = 5,
-    batch_size = 1000,
-    maxlen_memory = 10_000_000,
-    maxage_memory = 3600,
-    dask = False,
+    poll_interval=5,
+    batch_size=1000,
+    maxlen_memory=10_000_000,
+    maxage_memory=3600,
+    dask=False,
     **kwargs,
 ):
     """
@@ -489,12 +489,12 @@ def from_kafka_batched_scatter(
 
         kwargs['loop'] = default_client().loop
     source = FromKafkaBatched(
-        topics = topics,
-        consumer_params = consumer_params,
-        poll_interval = poll_interval,
-        batch_size = batch_size,
-        maxlen_memory = maxlen_memory,
-        maxage_memory = maxage_memory,
+        topics=topics,
+        consumer_params=consumer_params,
+        poll_interval=poll_interval,
+        batch_size=batch_size,
+        maxlen_memory=maxlen_memory,
+        maxage_memory=maxage_memory,
         **kwargs,
     )
 

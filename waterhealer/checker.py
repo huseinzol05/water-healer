@@ -77,7 +77,7 @@ def check_leakage(func):
 
             message = {'reason': f'{func_name} leaking', 'not_in_uuid': not_in}
 
-            logging.error(message['reason'], extra = message)
+            logging.error(message['reason'], extra=message)
 
             # We did like this because when we distributed to dask worker, it is very hard to get `not_in` uuids.
             raise Exception(json.dumps(message))

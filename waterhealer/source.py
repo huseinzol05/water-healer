@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 def _evolve(
-    source, name, time_execution_metrics = True, data_size_metrics = True
+    source, name, time_execution_metrics=True, data_size_metrics=True
 ):
     for c in source.downstreams:
         c.total_before = 0
@@ -72,7 +72,7 @@ def _evolve(
 
             if c.is_dask:
 
-                def additional(self, x, who = None):
+                def additional(self, x, who=None):
                     client = default_client()
 
                     result = client.submit(
@@ -82,7 +82,7 @@ def _evolve(
 
             else:
 
-                def additional(self, x, who = None):
+                def additional(self, x, who=None):
                     self.total_before.inc()
                     if self.data_size_metrics:
                         self.data_size_before.observe(sys.getsizeof(x) / 1000)
@@ -120,9 +120,9 @@ def _evolve(
             c.update = functools.partial(additional, c)
         c = _evolve(
             c,
-            name = f,
-            time_execution_metrics = time_execution_metrics,
-            data_size_metrics = data_size_metrics,
+            name=f,
+            time_execution_metrics=time_execution_metrics,
+            data_size_metrics=data_size_metrics,
         )
 
     return source
@@ -146,13 +146,13 @@ def metrics(
         data size metrics.
     port: int, (default=8000)
         default port for prometheus exporter.
-        
+
     """
     start_http_server(port)
     source = _evolve(
         source,
-        name = 'source',
-        time_execution_metrics = time_execution_metrics,
-        data_size_metrics = data_size_metrics,
+        name='source',
+        time_execution_metrics=time_execution_metrics,
+        data_size_metrics=data_size_metrics,
     )
     return source
