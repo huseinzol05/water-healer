@@ -42,6 +42,7 @@ This library also added streaming metrics, auto-shutdown, auto-graceful, checkpo
       * [waterhealer.metrics](#waterhealermetrics)
       * [waterhealer.auto_shutdown](#waterhealerauto_shutdown)
   * [Examples](#Examples)
+  * [What is the pain points?](#What-is-the-pain-points?)
 
 ## Problem statement
 
@@ -475,7 +476,7 @@ It is like `map`, but do `map` for each elements in a batch in async manner.
 Partial code can be like this,
 
 ```python
-.map(function).partition(5).partition(5).foreach_async(wh.healing_batch, stream = source)
+.map(function).partition(5).partition(5)
 ```
 
 Example, [simple-plus-nested-batch.ipynb](example/simple-plus-nested-batch.ipynb)
@@ -731,3 +732,13 @@ def auto_shutdown(
 ## Examples
 
 For more complicated example, simply check notebooks in [example](example).
+
+## What is the pain points?
+
+1. Hard to maintain offset references.
+
+When your streaming pipeline grow larger, to maintain the offset definition until `healing` is very hard, you need to debug a lot.
+
+2. No web UI.
+
+Currently we do not have front-end skill to develop web UI for pipeline visualization and metrics in real time manner.
