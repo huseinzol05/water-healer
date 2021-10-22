@@ -484,6 +484,7 @@ Example, [simple-plus-nested-batch.ipynb](example/simple-plus-nested-batch.ipynb
 
 * [waterhealer.from_kafka](#waterhealerfrom_kafka)
 * [waterhealer.from_kafka_batched](#waterhealerfrom_kafka_batched)
+* [waterhealer.from_kafka_batched_scatter](#waterhealerfrom_kafka_batched_scatter)
 
 #### waterhealer.from_kafka
 
@@ -577,7 +578,7 @@ Same as `waterhealer.from_kafka`, but we pulled partitions in parallel manners.
 
 Example, [kafka-batch-dask-simple-plus-batch.ipynb](example/kafka-batch-dask-simple-plus-batch.ipynb)
 
-#### water.from_kafka_batched_scatter
+#### waterhealer.from_kafka_batched_scatter
 
 ```python
 def from_kafka_batched_scatter(
