@@ -6,7 +6,7 @@
 
 ---
 
-**water-healer**, Extension of Streamz to update Kafka consumer offset for every successful sink.
+**water-healer**, Forked of Streamz to update Kafka consumer offset for every successful sink.
 
 This library also added streaming metrics, auto-shutdown, auto-graceful, checkpointing and additional functions to stream pipeline.
 
@@ -32,7 +32,6 @@ This library also added streaming metrics, auto-shutdown, auto-graceful, checkpo
       * [foreach_async](#foreach_async)
     * [healing](#healing)
       * [waterhealer.healing](#waterhealerhealing)
-      * [waterhealer.healing_batch](#waterhealerhealing_batch)
     * [kafka](#kafka)
       * [waterhealer.from_kafka](#waterhealerfrom_kafka)
       * [waterhealer.from_kafka_batched](#waterhealerfrom_kafka_batched)
@@ -187,7 +186,7 @@ source = wh.from_kafka(
         'auto.offset.reset': 'latest',
     })
 
-source.sink(wh.healing, source = source)
+source.healing()
 ```
 
 We need to use `waterhealer.from_kafka` for streaming source, and use `waterhealer.healing` for sinking or mapping process.
@@ -308,20 +307,24 @@ def inc(x):
     return x + 1
 
 source = Stream()
-source.map(inc).sink(wh.healing, source = source)
-wh.auto_shutdown(source, graceful = 5400)
+source.map(inc).healing()
+wh.auto_shutdown(source, graceful_offset = 5400)
 ```
 
-`wh.auto_shutdown(source, graceful = 5400)` will shutdown after 5400 seconds if no update offset after 5400 seconds. To disable it, simply `wh.auto_shutdown(source, graceful = 0)`.
+`wh.auto_shutdown(source, graceful_offset = 5400)` will shutdown after 5400 seconds if no update offset after 5400 seconds. To disable it, simply `wh.auto_shutdown(source, graceful_offset = 0)`.
 
 ### auto shutdown dask
 
-When dask client disconnected with dask cluster, `wh.auto_shutdown` also can helps us to shutdown the script.
+When dask client disconnected with dask cluster, `wh.auto_shutdown` also can helps us to shutdown the script. 
 
 ```python
 client = Client()
-wh.auto_shutdown(source, graceful = 5400, client = client)
+wh.auto_shutdown(source, got_dask = True)
 ```
+
+It will check Dask status, will shutdown if client status not in ('running','closing','connecting','newly-created').
+
+To make it auto restart if python script shutdown, you can run it in kubernetes or any auto restart program after use this interface.
 
 ### checkpointing
 
@@ -618,112 +621,43 @@ def from_kafka_batched_scatter(
 ### healing
 
 * [waterhealer.healing](#waterhealerhealing)
-* [waterhealer.healing_batch](#waterhealerhealing_batch)
 
 #### waterhealer.healing
 
 ```python
-def healing(
-    row: Tuple,
-    source: Callable = None,
-    ignore: bool = False,
-    asynchronous: bool = True,
-    interval: int = 10,
-):
-    """
+class healing(Stream):
 
-    Parameters
-    ----------
-    row: tuple
-        (uuid, value)
-    source: waterhealer object
-        waterhealer object to connect with kafka.
-    ignore: bool, (default=False)
-        if True, ignore any failed update offset.
-    asynchronous: bool, (default=True)
-        if True, it will update kafka offset async manner.
-    interval: int, (default=10)
-        Every interval, will update batch of kafka offsets. Set 0 to update every healing process.
-    """
+    def __init__(self, upstream,
+                 ignore: bool = False,
+                 asynchronous: bool = False,
+                 interval: int = 10,
+                 **kwargs):
+        """
+        ignore: bool, (default=False)
+            if True, ignore any failed update offset.
+        asynchronous: bool, (default=False)
+            if True, it will update kafka offset async manner.
+        interval: int, (default=10)
+            Every interval, will update batch of kafka offsets.
+        """
 ```
 
 Partial code can be like this,
 
 ```python
-.map(function).sink(healing, source = source)
+.map(function).healing(interval = 2)
 ```
 
-This function will returned,
+`healing` will returned,
 
 ```python
-return {
-    'data': row[1],
-    'success': success,
-    'reason': reason,
-    'partition': partition,
-    'offset': offset,
-    'topic': topic,
-}
+[{'topic': 'testing', 'partition': 2, 'offset': 171},
+  {'topic': 'testing', 'partition': 4, 'offset': 170},
+  {'topic': 'testing', 'partition': 5, 'offset': 46},
+  {'topic': 'testing', 'partition': 3, 'offset': 49}]
 ```
 
 Example, [simple-plus-element.ipynb](example/simple-plus-element.ipynb)
-
-#### waterhealer.healing_batch
-
-Instead we do it one-by-one, we can do concurrent updates async manner.
-
-```python
-def healing_batch(
-    rows: Tuple[Tuple],
-    source: Callable = None,
-    ignore: bool = False,
-    asynchronous: bool = True,
-):
-    """
-
-    Parameters
-    ----------
-    row: tuple of tuple
-        ((uuid, value),)
-    source: waterhealer object
-        waterhealer object to connect with kafka
-    ignore: bool, (default=False)
-        if True, ignore any failed update offset.
-    asynchronous: bool, (default=True)
-        if True, it will update kafka offset async manner.
-    """
-```
-
-Partial code can be like this,
-
-```python
-.map(function).partition(5).sink(healing_batch, source = source)
-```
-
-This function will returned,
-
-```python
-return [{
-    'data': row[1],
-    'success': success,
-    'reason': reason,
-    'partition': partition,
-    'offset': offset,
-    'topic': topic,
-},
-{
-    'data': row[1],
-    'success': success,
-    'reason': reason,
-    'partition': partition,
-    'offset': offset,
-    'topic': topic,
-}]
-```
-
-A list of results `waterhealer.healing`.
-
-Example, [simple-plus-batch.ipynb](example/simple-plus-batch.ipynb)
 
 ### source
 
@@ -767,7 +701,6 @@ def auto_shutdown(
     interval: int = 5,
     sleep_before_shutdown: int = 2,
     auto_expired: int = 5400,
-    logging: bool = False,
 ):
     """
 
@@ -781,18 +714,16 @@ def auto_shutdown(
         if True, will check Dask status, will shutdown if client status not in ('running','closing','connecting','newly-created').
     graceful_offset: int, (default=3600)
         automatically shutdown the script if water-healer not updated any offsets after `graceful_offset` period. 
-        To off it, set it to 0.
+        To disable it, set it to 0.
     graceful_polling: int, (default=1800)
         automatically shutdown the script if kafka consumer not polling after `graceful_polling` period. 
-        To off it, set it to 0.
+        To disable it, set it to 0.
     interval: int, (default=5)
         check heartbeat every `interval`. 
     sleep_before_shutdown: int, (defaut=2)
         sleep (second) before shutdown.
     auto_expired: int, (default=5400)
         auto shutdown after `auto_expired`. Set to `0` to disable it.
-    logging: bool, (default=False)
-        If True, will print logging.error if got any error, else, print
     """
 ```
 

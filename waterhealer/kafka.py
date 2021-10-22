@@ -1,4 +1,4 @@
-from waterhealer.core import Stream, convert_interval, get_io_loop
+from waterhealer.core import Stream, convert_interval
 from tornado import gen
 from itertools import cycle
 from collections import defaultdict
@@ -52,8 +52,6 @@ class from_kafka(Source):
         Seconds that elapse between polling Kafka for new messages
     start: bool, (default=False)
         Whether to start polling upon instantiation
-    debug: bool, (default=False)
-        If True, will print topic, partition and offset for each polled message.
     maxlen_memory: int, (default=10_000_000)
         max length of topic and partition dictionary for healing process.
     maxage_memory: int, (default=3600)
@@ -66,7 +64,6 @@ class from_kafka(Source):
         consumer_params,
         poll_interval=0.1,
         start=False,
-        debug=False,
         maxlen_memory=10_000_000,
         maxage_memory=3600,
         **kwargs,
@@ -78,7 +75,6 @@ class from_kafka(Source):
         self.poll_interval = poll_interval
         super(from_kafka, self).__init__(ensure_io_loop=True, **kwargs)
         self.stopped = True
-        self.debug = debug
 
         if start:
             self.start()
@@ -109,10 +105,9 @@ class from_kafka(Source):
                     'offset': offset,
                     'topic': topic,
                 }
-                if self.debug:
-                    logger.warning(
-                        f'topic: {topic}, partition: {partition}, offset: {offset}, data: {val}'
-                    )
+                logger.info(
+                    f'topic: {topic}, partition: {partition}, offset: {offset}, data: {val}'
+                )
 
                 self.memory[topic_partition_str(topic, partition)][
                     offset
@@ -172,8 +167,6 @@ class from_kafka_batched(Source):
         Seconds that elapse between polling Kafka for new messages
     start: bool, (default=False)
         Whether to start polling upon instantiation
-    debug: bool, (default=False)
-        If True, will print topic, partition and offset for each polled message.
     maxlen_memory: int, (default=10_000_000)
         max length of topic and partition dictionary for healing process.
     maxage_memory: int, (default=3600)
@@ -188,7 +181,6 @@ class from_kafka_batched(Source):
         batch_timeout=10,
         poll_interval=0.1,
         start=False,
-        debug=False,
         maxlen_memory=10_000_000,
         maxage_memory=3600,
         **kwargs,
@@ -205,7 +197,6 @@ class from_kafka_batched(Source):
             ensure_io_loop=True, **kwargs
         )
         self.stopped = True
-        self.debug = debug
 
         if start:
             self.start()
@@ -245,10 +236,9 @@ class from_kafka_batched(Source):
                     'offset': offset,
                     'topic': topic,
                 }
-                if self.debug:
-                    logger.warning(
-                        f'topic: {topic}, partition: {partition}, offset: {offset}, data: {val}'
-                    )
+                logger.info(
+                    f'topic: {topic}, partition: {partition}, offset: {offset}, data: {val}'
+                )
 
                 self.memory[topic_partition_str(topic, partition)][
                     offset
