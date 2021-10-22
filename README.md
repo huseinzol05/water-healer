@@ -10,6 +10,10 @@
 
 This library also added streaming metrics, auto-shutdown, auto-graceful, checkpointing and additional functions to stream pipeline.
 
+<p align="left">
+<a href="https://github.com/hhatto/autopep8"><img alt="Code style: autopep8" src="https://img.shields.io/badge/code%20style-autopep8-000000.svg"></a>
+</p>
+
 ## Table of contents
 
   * [Problem statement](#Problem-statement)
@@ -42,7 +46,7 @@ This library also added streaming metrics, auto-shutdown, auto-graceful, checkpo
       * [waterhealer.metrics](#waterhealermetrics)
       * [waterhealer.auto_shutdown](#waterhealerauto_shutdown)
   * [Examples](#Examples)
-  * [What is the pain points?](#What-is-the-pain-points?)
+  * [What is the pain points?](#What-is-the-pain-points)
 
 ## Problem statement
 
