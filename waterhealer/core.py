@@ -531,6 +531,9 @@ class Stream(object):
 
             sync(self.loop, _)
 
+    def __call__(self, x, asynchronous=False):
+        return self.emit(x, asynchronous=asynchronous)
+
     def update(self, x, who=None):
         self._emit(x)
 

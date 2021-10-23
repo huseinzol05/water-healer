@@ -105,7 +105,7 @@ class from_kafka(Source):
                     'offset': offset,
                     'topic': topic,
                 }
-                logger.info(
+                logger.debug(
                     f'topic: {topic}, partition: {partition}, offset: {offset}, data: {val}'
                 )
 
@@ -236,7 +236,7 @@ class from_kafka_batched(Source):
                     'offset': offset,
                     'topic': topic,
                 }
-                logger.info(
+                logger.debug(
                     f'topic: {topic}, partition: {partition}, offset: {offset}, data: {val}'
                 )
 

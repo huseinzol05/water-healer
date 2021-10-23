@@ -480,10 +480,11 @@ It is like `map`, but do `map` for each elements in a batch in async manner.
 Partial code can be like this,
 
 ```python
-.map(function).partition(5).partition(5)
+source = Stream()
+source.partition(5).foreach_async(lambda x: 2*x).sink(print)
 ```
 
-Example, [simple-plus-nested-batch.ipynb](example/simple-plus-nested-batch.ipynb)
+Example, [foreach-async.ipynb](example/foreach-async.ipynb)
 
 ### kafka
 
@@ -580,8 +581,6 @@ class from_kafka_batched(Source):
 ```
 
 Same as `waterhealer.from_kafka`, but we pulled partitions in parallel manners.
-
-Example, [kafka-batch-dask-simple-plus-batch.ipynb](example/kafka-batch-dask-simple-plus-batch.ipynb)
 
 #### waterhealer.from_kafka_batched_scatter
 

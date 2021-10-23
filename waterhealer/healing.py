@@ -76,7 +76,7 @@ class healing(Stream):
         self.loop.add_callback(self.cb)
 
     def update(self, row, who=None):
-        logger.info(f'update, {row}')
+        logger.debug(f'update, {row}')
         if len(row) == 2:
             if isinstance(row[0], dict):
                 partition = row[0].get('partition', -1)
@@ -102,7 +102,7 @@ class healing(Stream):
         success = False
         now = datetime.now()
         if len(self.partitions) and self.consumer is not None:
-            logger.debug(f'commiting {self.partitions}')
+            logger.debug(f'committing {self.partitions}')
             try:
                 self.consumer.commit(
                     offsets=self.partitions, asynchronous=self.asynchronous
@@ -116,7 +116,7 @@ class healing(Stream):
                 else:
                     logger.exception(e)
                     raise
-        logger.info(f'healing successful: {success}, {now}')
+        logger.debug(f'healing successful: {success}, {now}')
         return success
 
     @gen.coroutine
@@ -141,10 +141,10 @@ class healing(Stream):
                     for offset in sorted(self.memory[topic_partition].keys()):
                         if self.memory[topic_partition][offset]:
                             if current_offset >= high_offset:
-                                logger.info(
+                                logger.warning(
                                     f'topic partition: {topic_partition}, offset: {offset}, current offset already same as high offset')
                             elif offset < current_offset:
-                                logger.info(
+                                logger.warning(
                                     f'topic partition: {topic_partition}, offset: {offset}, current offset higher than message offset')
                             else:
                                 self.partitions.append(
