@@ -16,6 +16,9 @@ def get_memory(source, consumer=None, memory=None):
     if hasattr(source, 'memory'):
         return source, source.consumer, source.memory
 
+    if isinstance(source, tuple):
+        source = source[0]
+
     for upstream in source.upstreams:
         if hasattr(upstream, 'memory'):
             return upstream, upstream.consumer, upstream.memory
@@ -27,6 +30,9 @@ def get_error(source, error=None, last_poll=None):
     if hasattr(source, 'last_poll'):
         return source, source.error, source.last_poll
 
+    if isinstance(source, tuple):
+        source = source[0]
+
     for upstream in source.upstreams:
         if hasattr(upstream, 'last_poll'):
             return upstream, upstream.error, upstream.last_poll
@@ -37,6 +43,9 @@ def get_error(source, error=None, last_poll=None):
 def get_source(source):
     if hasattr(source, 'stop'):
         return source
+
+    if isinstance(source, tuple):
+        source = source[0]
 
     for upstream in source.upstreams:
         if hasattr(upstream, 'stop'):
@@ -150,6 +159,8 @@ class healing(Stream):
                                 self.partitions.append(
                                     ck.TopicPartition(topic, partition, offset + 1)
                                 )
+                        else:
+                            break
 
             if self.commit():
                 L = []
