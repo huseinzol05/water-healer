@@ -542,6 +542,8 @@ Data structure of uuid,
 
 If you want to use waterhealer, you need to make sure `uuid` from `from_kafka` succesfully transported until healing, or else it cannot update the offset.
 
+Example, [simple-plus-element.ipynb](example/simple-plus-element.ipynb).
+
 **Output from `waterhealer.from_kafka` is different from any sources object from `streamz`, `streamz` only returned `value`, not tuple as `waterhealer.from_kafka`.**
 
 #### waterhealer.from_kafka_batched
@@ -622,6 +624,8 @@ def from_kafka_batched_scatter(
         dask bootstrap, will automatically scatter the offsets if provided the bootstrap.
     """
 ```
+
+Example, [simple-plus-element-kafka-scatter.ipynb](example/simple-plus-element-kafka-scatter.ipynb).
 
 ### healing
 
