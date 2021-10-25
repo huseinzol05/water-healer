@@ -6,4 +6,4 @@ from . import checker
 from . import plugin
 from .source import metrics
 
-__version__ = '0.0.7'
+__version__ = '0.1'
