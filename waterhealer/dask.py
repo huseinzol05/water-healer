@@ -58,12 +58,12 @@ class map(DaskStream):
 
         DaskStream.__init__(self, upstream, checkpoint=checkpoint)
 
-    def update(self, x, who=None):
+    def update(self, x, emit_id=None, who=None):
         client = default_client()
         result = client.submit(
             self.func, x, *self.args, **self.kwargs, pure=False
         )
-        return self._emit(result)
+        return self._emit(result, emit_id=emit_id)
 
 
 @DaskStream.register_api()
@@ -83,10 +83,10 @@ class accumulate(DaskStream):
         self.kwargs = kwargs
         DaskStream.__init__(self, upstream, checkpoint=checkpoint)
 
-    def update(self, x, who=None):
+    def update(self, x, emit_id=None, who=None):
         if self.state is core.no_default:
             self.state = x
-            return self._emit(self.state)
+            return self._emit(self.state, emit_id=emit_id)
         else:
             client = default_client()
             result = client.submit(
@@ -98,7 +98,7 @@ class accumulate(DaskStream):
             else:
                 state = result
             self.state = state
-            return self._emit(result)
+            return self._emit(result, emit_id=emit_id)
 
 
 @core.Stream.register_api()
@@ -110,14 +110,14 @@ class scatter(DaskStream):
     """
 
     @gen.coroutine
-    def update(self, x, who=None):
+    def update(self, x, emit_id=None, who=None):
         try:
             client = default_client()
             future_as_list = yield client.scatter(
                 [x], asynchronous=True, hash=False
             )
             future = future_as_list[0]
-            f = yield self._emit(future)
+            f = yield self._emit(future, emit_id=emit_id)
             raise gen.Return(f)
         except Exception as e:
             self.error = True
@@ -144,11 +144,11 @@ class gather(core.Stream):
     """
 
     @gen.coroutine
-    def update(self, x, who=None):
+    def update(self, x, emit_id=None, who=None):
         try:
             client = default_client()
             result = yield client.gather(x, asynchronous=True)
-            result2 = yield self._emit(result)
+            result2 = yield self._emit(result, emit_id=emit_id)
             raise gen.Return(result2)
         except Exception as e:
             self.error = True
@@ -166,10 +166,10 @@ class starmap(DaskStream):
             self, upstream, stream_name=stream_name, checkpoint=checkpoint
         )
 
-    def update(self, x, who=None):
+    def update(self, x, emit_id=None, who=None):
         client = default_client()
         result = client.submit(apply, self.func, x, self.kwargs, pure=False)
-        return self._emit(result)
+        return self._emit(result, emit_id=emit_id)
 
 
 @DaskStream.register_api()

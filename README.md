@@ -25,6 +25,7 @@ This library also added streaming metrics, auto-shutdown, auto-graceful, checkpo
     * [streaming metrics](#streaming-metrics)
     * [auto shutdown](#auto-shutdown)
     * [auto graceful delete](#auto-graceful-delete)
+    * [JSON logging with unique emit ID](#JSON-logging-with-unique-emit-ID)
     * [checkpointing](#checkpointing)
       * [disable checkpointing using OS environment](#disable-checkpointing-using-os-environment)
   * [Usage](#Usage)
@@ -331,6 +332,40 @@ It will check Dask status, will shutdown if client status not in ('running','clo
 
 To make it auto restart if python script shutdown, you can run it in kubernetes or any auto restart program after use this interface.
 
+### JSON logging with unique emit ID
+
+Let say every emit, you want to put a unique record to keep track for logging purpose, to do that, you need to enable,
+
+```bash
+export ENABLE_JSON_LOGGING=true
+```
+
+Or pythonic way,
+
+```bash
+import os
+os.environ['ENABLE_JSON_LOGGING'] = 'true'
+
+import waterhealer
+```
+
+Default is `false`, if you enable it,
+
+```text
+{"written_at": "2021-11-10T11:57:11.061Z", "written_ts": 1636545431061862000, "msg": "{'function_name': 'Stream', 'data': '{\"i\": 0, \"data\": 1}'}", "type": "log", "logger": "water-healer", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "emit_id": "c5088a71-a7ad-4ba2-bfe4-c5ae3f4ac309"}
+{"written_at": "2021-11-10T11:57:11.167Z", "written_ts": 1636545431167938000, "msg": "{'function_name': 'Stream', 'data': '{\"i\": 1, \"data\": 2}'}", "type": "log", "logger": "water-healer", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "emit_id": "a8e68fbd-bfd5-486f-840f-ca3591fbf7d6"}
+{"written_at": "2021-11-10T11:57:11.272Z", "written_ts": 1636545431272868000, "msg": "{'function_name': 'Stream', 'data': '{\"i\": 2, \"data\": 3}'}", "type": "log", "logger": "water-healer", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "emit_id": "6a388304-1f23-47d6-8513-778d5d5e3649"}
+{"written_at": "2021-11-10T11:57:11.376Z", "written_ts": 1636545431376816000, "msg": "{'function_name': 'Stream', 'data': '{\"i\": 3, \"data\": 4}'}", "type": "log", "logger": "water-healer", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "emit_id": "be62b692-07fc-435f-bb76-0906362a23a1"}
+{"written_at": "2021-11-10T11:57:11.484Z", "written_ts": 1636545431484289000, "msg": "{'function_name': 'Stream', 'data': '{\"i\": 4, \"data\": 5}'}", "type": "log", "logger": "water-healer", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "emit_id": "0c4c8de6-23eb-4254-9ff4-2ac9a8c00737"}
+{"written_at": "2021-11-10T11:57:11.487Z", "written_ts": 1636545431487095000, "msg": "{'function_name': 'partition', 'data': '(\\'{\"i\": 0, \"data\": 1}\\', \\'{\"i\": 1, \"data\": 2}\\', \\'{\"i\": 2, \"data\": 3}\\', \\'{\"i\": 3, \"data\": 4}\\', \\'{\"i\": 4, \"data\": 5}\\')'}", "type": "log", "logger": "water-healer", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "emit_id": "0c4c8de6-23eb-4254-9ff4-2ac9a8c00737"}
+{"written_at": "2021-11-10T11:57:11.489Z", "written_ts": 1636545431489063000, "msg": "{'function_name': 'map.json_loads', 'data': \"[{'i': 0, 'data': 1}, {'i': 1, 'data': 2}, {'i': 2, 'data': 3}, {'i': 3, 'data': 4}, {'i': 4, 'data': 5}]\"}", "type": "log", "logger": "water-healer", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "emit_id": "0c4c8de6-23eb-4254-9ff4-2ac9a8c00737"}
+{"written_at": "2021-11-10T11:57:11.491Z", "written_ts": 1636545431491076000, "msg": "{'function_name': 'map.increment_left', 'data': \"[{'i': 0, 'data': 1, 'left': 2}, {'i': 1, 'data': 2, 'left': 3}, {'i': 2, 'data': 3, 'left': 4}, {'i': 3, 'data': 4, 'left': 5}, {'i': 4, 'data': 5, 'left': 6}]\"}", "type": "log", "logger": "water-healer", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "emit_id": "0c4c8de6-23eb-4254-9ff4-2ac9a8c00737"}
+{"written_at": "2021-11-10T11:57:11.492Z", "written_ts": 1636545431492948000, "msg": "{'function_name': 'map.increment_right', 'data': \"[{'i': 0, 'data': 1, 'right': 2}, {'i': 1, 'data': 2, 'right': 3}, {'i': 2, 'data': 3, 'right': 4}, {'i': 3, 'data': 4, 'right': 5}, {'i': 4, 'data': 5, 'right': 6}]\"}", "type": "log", "logger": "water-healer", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "emit_id": "0c4c8de6-23eb-4254-9ff4-2ac9a8c00737"}
+{"written_at": "2021-11-10T11:57:11.494Z", "written_ts": 1636545431494455000, "msg": "{'function_name': 'zip', 'data': \"([{'i': 0, 'data': 1, 'left': 2}, {'i': 1, 'data': 2, 'left': 3}, {'i': 2, 'data': 3, 'left': 4}, {'i': 3, 'data': 4, 'left': 5}, {'i': 4, 'data': 5, 'left': 6}], [{'i': 0, 'data': 1, 'right': 2}, {'i': 1, 'data': 2, 'right': 3}, {'i': 2, 'data': 3, 'right': 4}, {'i': 3, 'data': 4, 'right': 5}, {'i': 4, 'data': 5, 'right': 6}])\"}", "type": "log", "logger": "water-healer", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "emit_id": "0c4c8de6-23eb-4254-9ff4-2ac9a8c00737"}
+```
+
+For example, check [json-logging-emit-id.ipynb](example/json-logging-emit-id.ipynb).
+
 ### checkpointing
 
 Let say every emit, I want to store value from each nodes returned, example as,
@@ -363,21 +398,25 @@ Output is,
 
 Checkpointing also can put on `zip`, `sink`, and other interfaces.
 
-Check more extensive example including Dask checkpointing on [dask-checkpointing.ipynb](example/dask-checkpointing.ipynb).
+Check example at [checkpointing.ipynb](example/checkpointing.ipynb).
+
+More extensive example including Dask checkpointing on [dask-checkpointing.ipynb](example/dask-checkpointing.ipynb).
 
 #### disable checkpointing using OS environment
 
 Incase we are so lazy to remove `checkpoint = True`, we can disable checkpointing using OS environment, by simply set,
 
 ```bash
-export DISABLE_CHECKPOINTING=true
+export ENABLE_CHECKPOINTING=false
 ```
 
 Or pythonic way,
 
 ```bash
 import os
-os.environ['DISABLE_CHECKPOINTING'] = 'true'
+os.environ['ENABLE_CHECKPOINTING'] = 'false'
+
+import waterhealer
 ```
 
 ## Usage

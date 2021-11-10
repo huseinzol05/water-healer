@@ -167,7 +167,7 @@ class healing(Stream):
                 for p in self.partitions:
                     self.memory[topic_partition_str(p.topic, p.partition)].pop(p.offset - 1)
                     L.append({'topic': p.topic, 'partition': p.partition, 'offset': p.offset - 1})
-                self.last = self._emit(L)
+                self.last = self._emit(L, emit_id=emit_id)
                 self.partitions = []
             yield self.last
             yield gen.sleep(self.interval)
