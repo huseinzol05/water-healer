@@ -8,7 +8,7 @@
 
 **water-healer**, Forked of Streamz to update Kafka consumer offset for every successful sink.
 
-This library also added streaming metrics, auto-shutdown, auto-graceful, checkpointing and additional functions to stream pipeline.
+This library also added streaming metrics, auto-shutdown, auto-graceful, unique emit ID, checkpointing and additional functions to stream pipeline.
 
 <p align="left">
 <a href="https://github.com/hhatto/autopep8"><img alt="Code style: autopep8" src="https://img.shields.io/badge/code%20style-autopep8-000000.svg"></a>
@@ -338,6 +338,7 @@ Let say every emit, you want to put a unique record to keep track for logging pu
 
 ```bash
 export ENABLE_JSON_LOGGING=true
+export LOGLEVEL=DEBUG
 ```
 
 Or pythonic way,
@@ -345,6 +346,7 @@ Or pythonic way,
 ```bash
 import os
 os.environ['ENABLE_JSON_LOGGING'] = 'true'
+os.environ['LOGLEVEL'] = 'DEBUG'
 
 import waterhealer
 ```
@@ -352,19 +354,30 @@ import waterhealer
 Default is `false`, if you enable it,
 
 ```text
-{"written_at": "2021-11-10T11:57:11.061Z", "written_ts": 1636545431061862000, "msg": "{'function_name': 'Stream', 'data': '{\"i\": 0, \"data\": 1}'}", "type": "log", "logger": "water-healer", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "emit_id": "c5088a71-a7ad-4ba2-bfe4-c5ae3f4ac309"}
-{"written_at": "2021-11-10T11:57:11.167Z", "written_ts": 1636545431167938000, "msg": "{'function_name': 'Stream', 'data': '{\"i\": 1, \"data\": 2}'}", "type": "log", "logger": "water-healer", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "emit_id": "a8e68fbd-bfd5-486f-840f-ca3591fbf7d6"}
-{"written_at": "2021-11-10T11:57:11.272Z", "written_ts": 1636545431272868000, "msg": "{'function_name': 'Stream', 'data': '{\"i\": 2, \"data\": 3}'}", "type": "log", "logger": "water-healer", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "emit_id": "6a388304-1f23-47d6-8513-778d5d5e3649"}
-{"written_at": "2021-11-10T11:57:11.376Z", "written_ts": 1636545431376816000, "msg": "{'function_name': 'Stream', 'data': '{\"i\": 3, \"data\": 4}'}", "type": "log", "logger": "water-healer", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "emit_id": "be62b692-07fc-435f-bb76-0906362a23a1"}
-{"written_at": "2021-11-10T11:57:11.484Z", "written_ts": 1636545431484289000, "msg": "{'function_name': 'Stream', 'data': '{\"i\": 4, \"data\": 5}'}", "type": "log", "logger": "water-healer", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "emit_id": "0c4c8de6-23eb-4254-9ff4-2ac9a8c00737"}
-{"written_at": "2021-11-10T11:57:11.487Z", "written_ts": 1636545431487095000, "msg": "{'function_name': 'partition', 'data': '(\\'{\"i\": 0, \"data\": 1}\\', \\'{\"i\": 1, \"data\": 2}\\', \\'{\"i\": 2, \"data\": 3}\\', \\'{\"i\": 3, \"data\": 4}\\', \\'{\"i\": 4, \"data\": 5}\\')'}", "type": "log", "logger": "water-healer", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "emit_id": "0c4c8de6-23eb-4254-9ff4-2ac9a8c00737"}
-{"written_at": "2021-11-10T11:57:11.489Z", "written_ts": 1636545431489063000, "msg": "{'function_name': 'map.json_loads', 'data': \"[{'i': 0, 'data': 1}, {'i': 1, 'data': 2}, {'i': 2, 'data': 3}, {'i': 3, 'data': 4}, {'i': 4, 'data': 5}]\"}", "type": "log", "logger": "water-healer", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "emit_id": "0c4c8de6-23eb-4254-9ff4-2ac9a8c00737"}
-{"written_at": "2021-11-10T11:57:11.491Z", "written_ts": 1636545431491076000, "msg": "{'function_name': 'map.increment_left', 'data': \"[{'i': 0, 'data': 1, 'left': 2}, {'i': 1, 'data': 2, 'left': 3}, {'i': 2, 'data': 3, 'left': 4}, {'i': 3, 'data': 4, 'left': 5}, {'i': 4, 'data': 5, 'left': 6}]\"}", "type": "log", "logger": "water-healer", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "emit_id": "0c4c8de6-23eb-4254-9ff4-2ac9a8c00737"}
-{"written_at": "2021-11-10T11:57:11.492Z", "written_ts": 1636545431492948000, "msg": "{'function_name': 'map.increment_right', 'data': \"[{'i': 0, 'data': 1, 'right': 2}, {'i': 1, 'data': 2, 'right': 3}, {'i': 2, 'data': 3, 'right': 4}, {'i': 3, 'data': 4, 'right': 5}, {'i': 4, 'data': 5, 'right': 6}]\"}", "type": "log", "logger": "water-healer", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "emit_id": "0c4c8de6-23eb-4254-9ff4-2ac9a8c00737"}
-{"written_at": "2021-11-10T11:57:11.494Z", "written_ts": 1636545431494455000, "msg": "{'function_name': 'zip', 'data': \"([{'i': 0, 'data': 1, 'left': 2}, {'i': 1, 'data': 2, 'left': 3}, {'i': 2, 'data': 3, 'left': 4}, {'i': 3, 'data': 4, 'left': 5}, {'i': 4, 'data': 5, 'left': 6}], [{'i': 0, 'data': 1, 'right': 2}, {'i': 1, 'data': 2, 'right': 3}, {'i': 2, 'data': 3, 'right': 4}, {'i': 3, 'data': 4, 'right': 5}, {'i': 4, 'data': 5, 'right': 6}])\"}", "type": "log", "logger": "water-healer", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "emit_id": "0c4c8de6-23eb-4254-9ff4-2ac9a8c00737"}
+{"written_at": "2021-11-11T05:30:39.786Z", "written_ts": 1636608639786755000, "msg": "{'function_name': 'Stream', 'data': '{\"i\": 0, \"data\": 1}'}", "type": "log", "logger": "root", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "function_name": null, "emit_id": "496cc1c7-3e70-4b54-9a12-7b13924f0b4e"}
+{"written_at": "2021-11-11T05:30:39.891Z", "written_ts": 1636608639891420000, "msg": "{'function_name': 'Stream', 'data': '{\"i\": 1, \"data\": 2}'}", "type": "log", "logger": "root", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "function_name": null, "emit_id": "4dbc7d17-e6dd-4a5d-9908-fd0362959bf7"}
+{"written_at": "2021-11-11T05:30:39.997Z", "written_ts": 1636608639997099000, "msg": "{'function_name': 'Stream', 'data': '{\"i\": 2, \"data\": 3}'}", "type": "log", "logger": "root", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "function_name": null, "emit_id": "2ef29f90-97ff-4495-8513-7730df850758"}
+{"written_at": "2021-11-11T05:30:40.104Z", "written_ts": 1636608640104243000, "msg": "{'function_name': 'Stream', 'data': '{\"i\": 3, \"data\": 4}'}", "type": "log", "logger": "root", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "function_name": null, "emit_id": "bbc9d403-e9d4-4255-8ddd-661d8ae6368d"}
+{"written_at": "2021-11-11T05:30:40.206Z", "written_ts": 1636608640206672000, "msg": "{'function_name': 'Stream', 'data': '{\"i\": 4, \"data\": 5}'}", "type": "log", "logger": "root", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "function_name": null, "emit_id": "9e2ecc23-6419-4a94-84a5-6b1cb748590e"}
+{"written_at": "2021-11-11T05:30:40.207Z", "written_ts": 1636608640207718000, "msg": "{'function_name': 'partition', 'data': '(\\'{\"i\": 0, \"data\": 1}\\', \\'{\"i\": 1, \"data\": 2}\\', \\'{\"i\": 2, \"data\": 3}\\', \\'{\"i\": 3, \"data\": 4}\\', \\'{\"i\": 4, \"data\": 5}\\')'}", "type": "log", "logger": "root", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "function_name": "partition", "emit_id": "9e2ecc23-6419-4a94-84a5-6b1cb748590e"}
+{"written_at": "2021-11-11T05:30:40.209Z", "written_ts": 1636608640209274000, "msg": "{'function_name': 'map.json_loads', 'data': \"[{'i': 0, 'data': 1}, {'i': 1, 'data': 2}, {'i': 2, 'data': 3}, {'i': 3, 'data': 4}, {'i': 4, 'data': 5}]\"}", "type": "log", "logger": "root", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "function_name": "map.json_loads", "emit_id": "9e2ecc23-6419-4a94-84a5-6b1cb748590e"}
+{"written_at": "2021-11-11T05:30:40.210Z", "written_ts": 1636608640210403000, "msg": "increment_left halloooo", "type": "log", "logger": "root", "thread": "MainThread", "level": "INFO", "module": "<ipython-input-5-554c07df66f4>", "line_no": 15, "function_name": "map.increment_left", "emit_id": "9e2ecc23-6419-4a94-84a5-6b1cb748590e"}
+{"written_at": "2021-11-11T05:30:40.211Z", "written_ts": 1636608640211674000, "msg": "{'function_name': 'map.increment_left', 'data': \"[{'i': 0, 'data': 1, 'left': 2}, {'i': 1, 'data': 2, 'left': 3}, {'i': 2, 'data': 3, 'left': 4}, {'i': 3, 'data': 4, 'left': 5}, {'i': 4, 'data': 5, 'left': 6}]\"}", "type": "log", "logger": "root", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "function_name": "map.increment_left", "emit_id": "9e2ecc23-6419-4a94-84a5-6b1cb748590e"}
+{"written_at": "2021-11-11T05:30:40.212Z", "written_ts": 1636608640212647000, "msg": "increment_right halloooo", "type": "log", "logger": "root", "thread": "MainThread", "level": "INFO", "module": "<ipython-input-5-554c07df66f4>", "line_no": 25, "function_name": "map.increment_right", "emit_id": "9e2ecc23-6419-4a94-84a5-6b1cb748590e"}
+{"written_at": "2021-11-11T05:30:40.213Z", "written_ts": 1636608640213564000, "msg": "{'function_name': 'map.increment_right', 'data': \"[{'i': 0, 'data': 1, 'right': 2}, {'i': 1, 'data': 2, 'right': 3}, {'i': 2, 'data': 3, 'right': 4}, {'i': 3, 'data': 4, 'right': 5}, {'i': 4, 'data': 5, 'right': 6}]\"}", "type": "log", "logger": "root", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "function_name": "map.increment_right", "emit_id": "9e2ecc23-6419-4a94-84a5-6b1cb748590e"}
+{"written_at": "2021-11-11T05:30:40.214Z", "written_ts": 1636608640214567000, "msg": "{'function_name': 'zip', 'data': \"([{'i': 0, 'data': 1, 'left': 2}, {'i': 1, 'data': 2, 'left': 3}, {'i': 2, 'data': 3, 'left': 4}, {'i': 3, 'data': 4, 'left': 5}, {'i': 4, 'data': 5, 'left': 6}], [{'i': 0, 'data': 1, 'right': 2}, {'i': 1, 'data': 2, 'right': 3}, {'i': 2, 'data': 3, 'right': 4}, {'i': 3, 'data': 4, 'right': 5}, {'i': 4, 'data': 5, 'right': 6}])\"}", "type": "log", "logger": "root", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "function_name": "zip", "emit_id": "9e2ecc23-6419-4a94-84a5-6b1cb748590e"}
+{"written_at": "2021-11-11T05:30:40.215Z", "written_ts": 1636608640215408000, "msg": "need to combine", "type": "log", "logger": "root", "thread": "MainThread", "level": "INFO", "module": "<ipython-input-5-554c07df66f4>", "line_no": 35, "function_name": "map.combine", "emit_id": "9e2ecc23-6419-4a94-84a5-6b1cb748590e"}
+{"written_at": "2021-11-11T05:30:40.216Z", "written_ts": 1636608640216577000, "msg": "{'function_name': 'map.combine', 'data': '[4, 6, 8, 10, 12]'}", "type": "log", "logger": "root", "thread": "MainThread", "level": "DEBUG", "module": "core", "line_no": 498, "function_name": "map.combine", "emit_id": "9e2ecc23-6419-4a94-84a5-6b1cb748590e"}
+[4, 6, 8, 10, 12]
 ```
 
-For example, check [json-logging-emit-id.ipynb](example/json-logging-emit-id.ipynb).
+`emit_id` also can correlate with `logging.info` / `logging.warning` / `logging.debug` / `logging.error`, you can see `emit_id` along with a message `need to combine`,
+
+```text
+{"written_at": "2021-11-11T05:30:40.215Z", "written_ts": 1636608640215408000, "msg": "need to combine", "type": "log", "logger": "root", "thread": "MainThread", "level": "INFO", "module": "<ipython-input-5-554c07df66f4>", "line_no": 35, "function_name": "map.combine", "emit_id": "9e2ecc23-6419-4a94-84a5-6b1cb748590e"}
+```
+
+For example, check [json-logging-emit-id.ipynb](example/json-logging-emit-id.ipynb), or with kafka example [simple-plus-element-emit-id.ipynb](example/simple-plus-element-emit-id.ipynb).
 
 ### checkpointing
 

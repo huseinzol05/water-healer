@@ -1,7 +1,6 @@
 from __future__ import absolute_import, division, print_function
 
 from operator import getitem
-
 from tornado import gen
 
 try:
@@ -12,8 +11,10 @@ except:
 from distributed.client import default_client
 
 from .core import Stream
+from .function import get_stream
 from . import core
 from streamz import sources
+import time
 
 
 class DaskStream(Stream):
@@ -144,12 +145,16 @@ class gather(core.Stream):
     """
 
     @gen.coroutine
-    def update(self, x, emit_id=None, who=None):
+    def update(self, x, sleep_between_gather=0.1, emit_id=None, who=None):
         try:
             client = default_client()
             result = yield client.gather(x, asynchronous=True)
             result2 = yield self._emit(result, emit_id=emit_id)
             raise gen.Return(result2)
+
+            # result1 = yield get_stream(self).wait(sleep_between_gather=sleep_between_gather)
+            # raise gen.Return(result1)
+
         except Exception as e:
             self.error = True
             raise

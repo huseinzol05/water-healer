@@ -1,57 +1,16 @@
 from tornado import gen
 from datetime import datetime
-from waterhealer.core import Stream, convert_interval
-from waterhealer.function import topic_partition_str, str_topic_partition
+from waterhealer.core import Stream, convert_interval, logger
+from waterhealer.function import (
+    topic_partition_str,
+    str_topic_partition,
+    get_memory,
+    get_error,
+    get_source,
+)
 import confluent_kafka as ck
-import logging
 import os
 import time
-
-LAST_UPDATED = datetime.now()
-logger = logging.getLogger()
-
-
-def get_memory(source, consumer=None, memory=None):
-
-    if hasattr(source, 'memory'):
-        return source, source.consumer, source.memory
-
-    if isinstance(source, tuple):
-        source = source[0]
-
-    for upstream in source.upstreams:
-        if hasattr(upstream, 'memory'):
-            return upstream, upstream.consumer, upstream.memory
-        return get_memory(upstream, consumer, memory)
-    return source, consumer, memory
-
-
-def get_error(source, error=None, last_poll=None):
-    if hasattr(source, 'last_poll'):
-        return source, source.error, source.last_poll
-
-    if isinstance(source, tuple):
-        source = source[0]
-
-    for upstream in source.upstreams:
-        if hasattr(upstream, 'last_poll'):
-            return upstream, upstream.error, upstream.last_poll
-        return get_error(upstream, error, last_poll)
-    return source, error, last_poll
-
-
-def get_source(source):
-    if hasattr(source, 'stop'):
-        return source
-
-    if isinstance(source, tuple):
-        source = source[0]
-
-    for upstream in source.upstreams:
-        if hasattr(upstream, 'stop'):
-            return upstream
-        return get_source(upstream)
-    return source
 
 
 @Stream.register_api()
@@ -78,13 +37,16 @@ class healing(Stream):
         self.interval = convert_interval(interval)
         self.partitions = []
         self.last = gen.moment
+        self.last_emit_id = None
         _, self.consumer, self.memory = get_memory(upstream)
 
         Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
 
         self.loop.add_callback(self.cb)
 
-    def update(self, row, who=None):
+    def update(self, row, emit_id=None, who=None):
+        if self.last_emit_id is None:
+            self.last_emit_id = emit_id
         logger.debug(f'update, {row}')
         if len(row) == 2:
             if isinstance(row[0], dict):
@@ -167,10 +129,11 @@ class healing(Stream):
                 for p in self.partitions:
                     self.memory[topic_partition_str(p.topic, p.partition)].pop(p.offset - 1)
                     L.append({'topic': p.topic, 'partition': p.partition, 'offset': p.offset - 1})
-                self.last = self._emit(L, emit_id=emit_id)
+                self.last = self._emit(L, emit_id=self.last_emit_id)
                 self.partitions = []
             yield self.last
             yield gen.sleep(self.interval)
+            self.last_emit_id = None
 
 
 def auto_shutdown(

@@ -49,6 +49,7 @@ from tornado.queues import Queue
 from distributed import Future
 import os
 import uuid
+import time
 
 try:
     from tornado.ioloop import PollIOLoop
@@ -64,7 +65,7 @@ from collections import Iterable
 
 from streamz.compatibility import get_thread_identity
 from streamz.orderedweakset import OrderedWeakrefSet
-from .function import to_bool
+from .function import to_bool, WaterHealerFormatter
 
 no_default = '--no-default--'
 
@@ -80,14 +81,14 @@ ENABLE_CHECKPOINTING = to_bool(os.environ.get('ENABLE_CHECKPOINTING', 'true'))
 ENABLE_JSON_LOGGING = to_bool(os.environ.get('ENABLE_JSON_LOGGING', 'false'))
 LOGLEVEL = os.environ.get('LOGLEVEL', 'INFO')
 
-logger = logging.getLogger('water-healer')
+logger = logging.getLogger()
 logger.setLevel(LOGLEVEL)
 
 if ENABLE_JSON_LOGGING:
     try:
         import json_logging
 
-        json_logging.init_non_web(enable_json=True)
+        json_logging.init_non_web(custom_formatter=WaterHealerFormatter, enable_json=True)
         logger.handlers = logging.getLogger('json_logging').handlers
     except BaseException:
         logger.warning('json-logging not installed. Please install it by `pip install json-logging` and try again.')
@@ -430,48 +431,46 @@ class Stream(object):
 
         return output._ipython_display_(**kwargs)
 
-    def wait(self, wait_time_last_node=2):
-        from distributed.client import default_client
-        import time
+    def wait(self, sleep_between_gather=0.1):
 
-        try:
-            client = default_client()
-        except Exception as e:
-            logger.warning(e)
-            return False
+        if ENABLE_CHECKPOINTING:
+            try:
+                from distributed.client import default_client
+                client = default_client()
+            except Exception as e:
+                logger.warning(e)
+                return
 
-        def get_last(source):
-            x = []
+            def get_last(source):
+                x = []
 
-            def loop(s):
-                for downstream in s.downstreams:
-                    if downstream._checkpoint:
-                        name = type(downstream).__name__
-                        if hasattr(downstream, 'func'):
-                            name = f'{name}.{downstream.func.__name__}'
-                        last = name
-                        x.append(last)
-                    loop(downstream)
+                def loop(s):
+                    for downstream in s.downstreams:
+                        if downstream._checkpoint:
+                            name = type(downstream).__name__
+                            if hasattr(downstream, 'func'):
+                                name = f'{name}.{downstream.func.__name__}'
+                            last = name
+                            x.append(last)
+                        loop(downstream)
 
-            loop(source)
-            return x[-1]
+                loop(source)
+                return x[-1]
 
-        last_name = get_last(self)
+            last_name = get_last(self)
 
-        while True:
-            found = False
-            for k in self.checkpoint.keys():
-                if last_name in k:
-                    found = True
+            while True:
+                found = False
+                for k in self.checkpoint.keys():
+                    if last_name in k:
+                        found = True
+                        break
+                if found:
                     break
-            if found:
-                break
-            time.sleep(wait_time_last_node)
+                time.sleep(sleep_between_gather)
 
-        for k, v in self.checkpoint.items():
-            self.checkpoint[k] = client.gather(v)
-
-        return True
+            for k, v in self.checkpoint.items():
+                self.checkpoint[k] = client.gather(v)
 
     def _climb(self, source, name, x):
 
@@ -1848,7 +1847,8 @@ class partition_time(Stream):
 
     def update(self, x, emit_id=None, who=None):
         self.buffer.append(x)
-        self.last_emit_id = emit_id
+        if self.last_emit_id is None:
+            self.last_emit_id = emit_id
         return self.last
 
     @gen.coroutine
