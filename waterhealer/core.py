@@ -493,7 +493,7 @@ class Stream(object):
         if hasattr(self, 'func'):
             name = f'{name}.{self.func.__name__}'
 
-        logger.debug({'function_name': name, 'data': str(x)[:10000]},
+        logger.info({'function_name': name, 'data': str(x)[:10000]},
                      extra={'props': {'emit_id': emit_id}})
 
         if self._checkpoint and ENABLE_CHECKPOINTING:

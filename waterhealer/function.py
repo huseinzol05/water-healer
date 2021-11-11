@@ -118,8 +118,8 @@ class WaterHealerFormatter(BaseJSONFormatter):
         while True:
             f_locals = f.f_locals
 
-            if 'emit_id' in f_locals:
-                emit_id = f_locals['emit_id']
+            if 'emit_id' in f_locals or ('self' in f_locals and hasattr(f_locals['self'], 'last_emit_id')):
+                emit_id = f_locals.get('emit_id', None) or getattr(f_locals['self'], 'last_emit_id', None)
                 function_name = type(f_locals['self']).__name__
                 if hasattr(f_locals['self'], 'func'):
                     function_name = f"{function_name}.{f_locals['self'].func.__name__}"

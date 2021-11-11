@@ -12,6 +12,8 @@ import confluent_kafka as ck
 import os
 import time
 
+LAST_UPDATED = datetime.now()
+
 
 @Stream.register_api()
 class healing(Stream):
@@ -87,7 +89,7 @@ class healing(Stream):
                 else:
                     logger.exception(e)
                     raise
-        logger.debug(f'healing successful: {success}, {now}')
+        logger.info(f'healing successful: {success}, {now}')
         return success
 
     @gen.coroutine
@@ -131,9 +133,9 @@ class healing(Stream):
                     L.append({'topic': p.topic, 'partition': p.partition, 'offset': p.offset - 1})
                 self.last = self._emit(L, emit_id=self.last_emit_id)
                 self.partitions = []
+                self.last_emit_id = None
             yield self.last
             yield gen.sleep(self.interval)
-            self.last_emit_id = None
 
 
 def auto_shutdown(
