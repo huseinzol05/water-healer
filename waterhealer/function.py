@@ -132,7 +132,7 @@ class WaterHealerFormatter(BaseJSONFormatter):
 
             while True:
                 f_locals = f.f_locals
-                if 'Dask-Default' in record.threadName and 'key' in f_locals:
+                if record.threadName.startswith('Dask-') and 'key' in f_locals:
                     function_name, emit_id = f_locals['key'].split('--')
 
                 if 'emit_id' in f_locals or ('self' in f_locals and hasattr(f_locals['self'], 'last_emit_id')):
