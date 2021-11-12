@@ -109,26 +109,6 @@ class WaterHealerFormatter(BaseJSONFormatter):
 
     def _format_log_object(self, record, request_util):
         json_log_object = super(WaterHealerFormatter, self)._format_log_object(record, request_util)
-        module = inspect.getmodule(inspect.currentframe().f_back)
-        no_of_go_up_level = 11
-        f = currentframe(no_of_go_up_level)
-        function_name = None
-        emit_id = None
-
-        while True:
-            f_locals = f.f_locals
-
-            if 'emit_id' in f_locals or ('self' in f_locals and hasattr(f_locals['self'], 'last_emit_id')):
-                emit_id = f_locals.get('emit_id', None) or getattr(f_locals['self'], 'last_emit_id', None)
-                function_name = type(f_locals['self']).__name__
-                if hasattr(f_locals['self'], 'func'):
-                    function_name = f"{function_name}.{f_locals['self'].func.__name__}"
-                break
-
-            if f.f_back is not None:
-                f = f.f_back
-            else:
-                break
 
         json_log_object.update({
             'msg': _sanitize_log_msg(record),
@@ -138,11 +118,38 @@ class WaterHealerFormatter(BaseJSONFormatter):
             'level': record.levelname,
             'module': record.module,
             'line_no': record.lineno,
-            'function_name': function_name,
-            'emit_id': emit_id,
         })
 
         if hasattr(record, 'props') and isinstance(record.props, dict):
             json_log_object.update(record.props)
+
+        if 'emit_id' not in json_log_object:
+            module = inspect.getmodule(inspect.currentframe().f_back)
+            no_of_go_up_level = 11
+            f = currentframe(no_of_go_up_level)
+            function_name = None
+            emit_id = None
+
+            while True:
+                f_locals = f.f_locals
+                if 'Dask-Default' in record.threadName and 'key' in f_locals:
+                    function_name, emit_id = f_locals['key'].split('--')
+
+                if 'emit_id' in f_locals or ('self' in f_locals and hasattr(f_locals['self'], 'last_emit_id')):
+                    emit_id = f_locals.get('emit_id', None) or getattr(f_locals['self'], 'last_emit_id', None)
+                    function_name = type(f_locals['self']).__name__
+                    if hasattr(f_locals['self'], 'func'):
+                        function_name = f"{function_name}.{f_locals['self'].func.__name__}"
+                    break
+
+                if f.f_back is not None:
+                    f = f.f_back
+                else:
+                    break
+
+            json_log_object.update({
+                'function_name': function_name,
+                'emit_id': emit_id
+            })
 
         return json_log_object

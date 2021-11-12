@@ -377,7 +377,7 @@ Default is `false`, if you enable it,
 {"written_at": "2021-11-11T05:30:40.215Z", "written_ts": 1636608640215408000, "msg": "need to combine", "type": "log", "logger": "root", "thread": "MainThread", "level": "INFO", "module": "<ipython-input-5-554c07df66f4>", "line_no": 35, "function_name": "map.combine", "emit_id": "9e2ecc23-6419-4a94-84a5-6b1cb748590e"}
 ```
 
-For example, check [json-logging-emit-id.ipynb](example/json-logging-emit-id.ipynb), or with kafka example [simple-plus-element-emit-id.ipynb](example/simple-plus-element-emit-id.ipynb).
+For example, check [json-logging-emit-id.ipynb](example/json-logging-emit-id.ipynb), or with kafka example [simple-plus-element-emit-id.ipynb](example/simple-plus-element-emit-id.ipynb), or with Dask cluster example [dask-emit-id.ipynb](example/dask-emit-id.ipynb).
 
 ### checkpointing
 
