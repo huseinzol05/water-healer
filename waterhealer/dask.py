@@ -14,6 +14,7 @@ from .core import Stream
 from .function import get_stream
 from . import core
 from streamz import sources
+import uuid
 import time
 
 
@@ -62,7 +63,7 @@ class map(DaskStream):
     def update(self, x, emit_id=None, who=None):
         client = default_client()
         result = client.submit(
-            self.func, x, *self.args, **self.kwargs, pure=False, key=f'{self.func.__name__}--{emit_id}'
+            self.func, x, *self.args, **self.kwargs, pure=False, key=f'{self.func.__name__}--{emit_id}--{str(uuid.uuid4())}'
         )
         return self._emit(result, emit_id=emit_id)
 
