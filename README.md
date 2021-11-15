@@ -132,7 +132,7 @@ On fourth polling, we should pull back `offset` 2, not proceed
 
 ### update offset for distributed processing
 
-In a real world, some of realtime functions really took a long, maybe caused some long polling like merging data from database or waiting some events.
+In a real world, some of realtime functions may take a while, maybe caused some long polling like merging data from database or waiting some events.
 
 Let say we have a single stream and 3 workers can execute a function in parallel manner, the function simply like,
 
