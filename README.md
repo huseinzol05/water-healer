@@ -132,7 +132,7 @@ On fourth polling, we should pull back `offset` 2, not proceed
 
 ### update offset for distributed processing
 
-In a real world, some of realtime functions may take a while, maybe caused some long polling like merging data from database or waiting some events.
+In a real world, some of realtime functions really took a long, maybe caused some long polling like merging data from database or waiting some events.
 
 Let say we have a single stream and 3 workers can execute a function in parallel manner, the function simply like,
 
@@ -299,9 +299,9 @@ wh.auto_shutdown(source, got_error = True)
 
 `wh.auto_shutdown` will wait event loop to close, if closed, halt python script.
 
-### auto graceful delete
+### auto graceful shutdown
 
-We also want to Streamz script auto delete itself if no update offset after N seconds. This only work if we added `wh.healing` in our streaming. To make it auto restart if python script shutdown, you can run it in kubernetes or any auto restart program after use this interface.
+We also want to Streamz script auto shutdown itself if no update offset after N seconds. This only work if we added `healing()` in our streaming. To make it auto restart if python script shutdown, you can run it in kubernetes or any auto restart program after use this interface.
 
 ```python
 from time import sleep, time
@@ -321,16 +321,14 @@ wh.auto_shutdown(source, graceful_offset = 5400)
 
 ### auto shutdown dask
 
-When dask client disconnected with dask cluster, `wh.auto_shutdown` also can helps us to shutdown the script. 
+When dask client disconnected with dask cluster, `wh.auto_shutdown` also can helps us to shutdown the script. To make it auto restart if python script shutdown, you can run it in kubernetes or any auto restart program after use this interface.
 
 ```python
 client = Client()
 wh.auto_shutdown(source, got_dask = True)
 ```
 
-It will check Dask status, will shutdown if client status not in ('running','closing','connecting','newly-created').
-
-To make it auto restart if python script shutdown, you can run it in kubernetes or any auto restart program after use this interface.
+It will check Dask status, will shutdown if client status not in `('running','closing','connecting','newly-created')`.
 
 ### JSON logging with unique emit ID
 
