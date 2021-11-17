@@ -798,4 +798,4 @@ When your streaming pipeline grow larger, to maintain the offset definition unti
 
 2. No web UI.
 
-Currently we do not have front-end skill to develop web UI for pipeline visualization and metrics in real time manner.
+My front-end sucks.
