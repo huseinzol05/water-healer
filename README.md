@@ -28,6 +28,7 @@ This library also added streaming metrics, auto-shutdown, auto-graceful, unique 
     * [JSON logging with unique emit ID](#JSON-logging-with-unique-emit-ID)
     * [checkpointing](#checkpointing)
       * [disable checkpointing using OS environment](#disable-checkpointing-using-os-environment)
+    * [check leakage on offsets](#check-leakage-on-offsets)
   * [Usage](#Usage)
     * [checker](#checker)
       * [check_leakage](#check_leakage)
@@ -430,6 +431,34 @@ os.environ['ENABLE_CHECKPOINTING'] = 'false'
 import waterhealer
 ```
 
+### check leakage on offsets
+
+Let say you have a function,
+
+```python
+def foo(rows):
+    # do something, messed up the offsets
+```
+
+This can break the water-healer due to missing offsets and to trace is very hard if your pipeline is very long. You can use decorator `wh.checker.check_leakage` to check leakage for your function,
+
+```python
+import waterhealer as wh
+
+@wh.checker.check_leakage
+def func(rows):
+    # do something cause after uuid not same as before uuid
+```
+
+`wh.checker.check_leakage` only validate specific structure of data,
+
+1. `List[Tuple[uuid, data]]`.
+2. `List[Dict[uuid, **data]]`.
+
+Check example at [json-logging-emit-id-check-leakage.ipynb](example/json-logging-emit-id-check-leakage).
+
+**`wh.checker.check_leakage` will raised an exception if found a leakage**.
+
 ## Usage
 
 ### checker
@@ -439,9 +468,12 @@ import waterhealer
 A decorator to check UUID leakage in before and after UUIDs.
 
 ```python
-@check_leakage
-def func(rows):
-    # do something cause after uuid not same as before uuid
+def check_leakage(func):
+    """
+    Check leakage for kafka offsets, only support below structure of data,
+    1. List[Tuple[uuid, data]]
+    2. List[Dict[uuid, **data]]
+    """
 ```
 
 ### core

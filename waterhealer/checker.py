@@ -1,27 +1,6 @@
 import functools
-import logging
-
-logger = logging.getLogger()
-
-
-def topic_partition_offset_str(topic, partition, offset):
-    return f'{topic}<!>{partition}<!>{offset}'
-
-
-def str_topic_partition_offset(string):
-    if isinstance(string, str):
-        splitted = string.split('<!>')
-        if len(splitted) != 3:
-            r = None
-        else:
-            r = {
-                'topic': splitted[0],
-                'partition': splitted[1],
-                'offset': splitted[2],
-            }
-    else:
-        r = None
-    return r
+from .core import logging
+from .function import topic_partition_offset_str, str_topic_partition_offset
 
 
 def insert_unique_uuid(row, uuids):
@@ -35,6 +14,11 @@ def insert_unique_uuid(row, uuids):
 
 
 def check_leakage(func):
+    """
+    Check leakage for kafka offsets, only support below structure of data,
+    1. List[Tuple[uuid, data]]
+    2. List[Dict[uuid, **data]]
+    """
     @functools.wraps(func)
     def wrapper_decorator(*args, **kwargs):
         before_uuid = set()
@@ -56,31 +40,28 @@ def check_leakage(func):
         value = func(*args, **kwargs)
 
         if isinstance(value, list) or isinstance(value, tuple):
-            for arg in value:
-                if isinstance(arg, list) or isinstance(arg, tuple):
-                    for row in arg:
-                        insert(row, after_uuid)
-                else:
-                    insert(arg, after_uuid)
+            for row in value:
+                insert(row, after_uuid)
         else:
-            insert(value, after_uuid)
+            insert(row, after_uuid)
 
         not_in = before_uuid - after_uuid
 
         if len(not_in):
             not_in = [str_topic_partition_offset(i) for i in not_in]
             not_in = list(filter(None, not_in))
-            before_uuid = list(before_uuid)
-            after_uuid = list(after_uuid)
+            before_uuid = [str_topic_partition_offset(i) for i in before_uuid]
+            after_uuid = [str_topic_partition_offset(i) for i in after_uuid]
 
             func_name = f'{func.__module__}.{func.__name__}'
 
-            message = {'reason': f'{func_name} leaking', 'not_in_uuid': not_in}
-
-            logging.error(message['reason'], extra=message)
-
-            # We did like this because when we distributed to dask worker, it is very hard to get `not_in` uuids.
-            raise Exception(json.dumps(message))
+            message = {'reason': f'{func_name} leaking',
+                       'not_in': not_in,
+                       'before': before_uuid,
+                       'after': after_uuid,
+                       'leaking': True}
+            logging.exception(message)
+            raise Exception(f'{func_name} leaking')
 
         return value
 

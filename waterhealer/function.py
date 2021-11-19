@@ -19,6 +19,26 @@ else:
             return sys.exc_info()[_no_of_go_up_level - 1].tb_frame.f_back
 
 
+def str_topic_partition_offset(string):
+    if isinstance(string, str):
+        splitted = string.split('<!>')
+        if len(splitted) != 3:
+            r = None
+        else:
+            r = {
+                'topic': splitted[0],
+                'partition': splitted[1],
+                'offset': splitted[2],
+            }
+    else:
+        r = None
+    return r
+
+
+def topic_partition_offset_str(topic, partition, offset):
+    return f'{topic}<!>{partition}<!>{offset}'
+
+
 def topic_partition_str(topic, partition):
     return f'{topic}<!>{partition}'
 
