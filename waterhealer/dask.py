@@ -19,7 +19,8 @@ import time
 
 
 class DaskStream(Stream):
-    """ A Parallel stream using Dask
+    """
+    A Parallel stream using Dask
 
     This object is fully compliant with the ``streamz.core.Stream`` object but
     uses a Dask client for execution.  Operations like ``map`` and
@@ -106,7 +107,8 @@ class accumulate(DaskStream):
 @core.Stream.register_api()
 @DaskStream.register_api()
 class scatter(DaskStream):
-    """ Convert local stream to Dask Stream
+    """
+    Convert local stream to Dask Stream.
 
     All elements flowing through the input will be scattered out to the cluster
     """
@@ -128,7 +130,8 @@ class scatter(DaskStream):
 
 @DaskStream.register_api()
 class gather(core.Stream):
-    """ Wait on and gather results from DaskStream to local Stream
+    """
+    Wait on and gather results from DaskStream to local Stream.
 
     This waits on every result in the stream and then gathers that result back
     to the local stream.  Warning, this can restrict parallelism.  It is common

@@ -153,7 +153,8 @@ def get_args(client, key):
 
 
 class Stream(object):
-    """ A Stream is an infinite sequence of data
+    """
+    A Stream is an infinite sequence of data
 
     Streams subscribe to each other passing and transforming data between them.
     A Stream object listens for updates from upstream, reacts to these updates,
@@ -291,24 +292,32 @@ class Stream(object):
                     downstream._inform_asynchronous(asynchronous)
 
     def _add_upstream(self, upstream):
-        """Add upstream to current upstreams, this method is overridden for
-        classes which handle stream specific buffers/caches"""
+        """
+        Add upstream to current upstreams, this method is overridden for
+        classes which handle stream specific buffers/caches.
+        """
         if self.upstreams == [None]:
             self.upstreams[0] = upstream
         else:
             self.upstreams.append(upstream)
 
     def _add_downstream(self, downstream):
-        """Add downstream to current downstreams"""
+        """
+        Add downstream to current downstreams.
+        """
         self.downstreams.add(downstream)
 
     def _remove_downstream(self, downstream):
-        """Remove downstream from current downstreams"""
+        """
+        Remove downstream from current downstreams.
+        """
         self.downstreams.remove(downstream)
 
     def _remove_upstream(self, upstream):
-        """Remove upstream from current upstreams, this method is overridden for
-        classes which handle stream specific buffers/caches"""
+        """
+        Remove upstream from current upstreams, this method is overridden for
+        classes which handle stream specific buffers/caches.
+        """
         if len(self.upstreams) == 1:
             self.upstreams[0] = [None]
         else:
@@ -316,7 +325,8 @@ class Stream(object):
 
     @classmethod
     def register_api(cls, modifier=identity):
-        """ Add callable to Stream API
+        """ 
+        Add callable to Stream API
 
         This allows you to register a new method onto this class.  You can use
         it as a decorator.::
@@ -353,7 +363,9 @@ class Stream(object):
         return _
 
     def start(self):
-        """ Start any upstream sources """
+        """
+        Start any upstream sources.
+        """
         for upstream in self.upstreams:
             upstream.start()
 
@@ -494,7 +506,7 @@ class Stream(object):
             name = f'{name}.{self.func.__name__}'
 
         logger.info({'function_name': name, 'data': str(x)[:10000]},
-                     extra={'props': {'emit_id': emit_id}})
+                    extra={'props': {'emit_id': emit_id}})
 
         if self._checkpoint and ENABLE_CHECKPOINTING:
             self._climb(self, name, x)
@@ -552,14 +564,16 @@ class Stream(object):
         self._emit(x, emit_id=emit_id)
 
     def gather(self):
-        """ This is a no-op for core streamz
+        """
+        This is a no-op for core streamz.
 
-        This allows gather to be used in both dask and core streams
+        This allows gather to be used in both dask and core streams.
         """
         return self
 
     def connect(self, downstream):
-        """ Connect this stream to a downstream element.
+        """
+        Connect this stream to a downstream element.
 
         Parameters
         ----------
@@ -570,7 +584,8 @@ class Stream(object):
         downstream._add_upstream(self)
 
     def disconnect(self, downstream):
-        """ Disconnect this stream to a downstream element.
+        """
+        Disconnect this stream to a downstream element.
 
         Parameters
         ----------
@@ -590,7 +605,7 @@ class Stream(object):
 
     def destroy(self, streams=None):
         """
-        Disconnect this stream from any upstream sources
+        Disconnect this stream from any upstream sources.
         """
         if streams is None:
             streams = self.upstreams
@@ -604,7 +619,9 @@ class Stream(object):
         return scatter(self, **kwargs)
 
     def remove(self, predicate):
-        """ Only pass through elements for which the predicate returns False """
+        """
+        Only pass through elements for which the predicate returns False.
+        """
         return self.filter(lambda x: not predicate(x))
 
     @ property
@@ -616,7 +633,8 @@ class Stream(object):
         return self.flatten
 
     def sink_to_list(self):
-        """ Append all elements of a stream to a list as they come in
+        """
+        Append all elements of a stream to a list as they come in.
 
         Examples
         --------
@@ -632,7 +650,9 @@ class Stream(object):
         return L
 
     def frequencies(self, **kwargs):
-        """ Count occurrences of elements """
+        """
+        Count occurrences of elements.
+        """
 
         def update_frequencies(last, x):
             return toolz.assoc(last, x, last.get(x, 0) + 1)
@@ -640,7 +660,8 @@ class Stream(object):
         return self.scan(update_frequencies, start={}, **kwargs)
 
     def visualize(self, filename='mystream.png', **kwargs):
-        """Render the computation of this object's task graph using graphviz.
+        """
+        Render the computation of this object's task graph using graphviz.
 
         Requires ``graphviz`` to be installed.
 
@@ -656,7 +677,8 @@ class Stream(object):
         return visualize(self, filename, **kwargs)
 
     def to_dataframe(self, example):
-        """ Convert a stream of Pandas dataframes to a DataFrame
+        """
+        Convert a stream of Pandas dataframes to a DataFrame.
 
         Examples
         --------
@@ -672,9 +694,10 @@ class Stream(object):
         return DataFrame(stream=self, example=example)
 
     def to_batch(self, **kwargs):
-        """ Convert a stream of lists to a Batch
+        """
+        Convert a stream of lists to a Batch.
 
-        All elements of the stream are assumed to be lists or tuples
+        All elements of the stream are assumed to be lists or tuples.
 
         Examples
         --------
@@ -695,7 +718,8 @@ class Stream(object):
 
 @ Stream.register_api()
 class sink(Stream):
-    """ Apply a function on every element
+    """
+    Apply a function on every element.
 
     Examples
     --------
@@ -740,7 +764,8 @@ class sink(Stream):
 
 @ Stream.register_api()
 class map(Stream):
-    """ Apply a function to every element in the stream
+    """
+    Apply a function to every element in the stream.
 
     Parameters
     ----------
@@ -786,7 +811,8 @@ class map(Stream):
 
 @ Stream.register_api()
 class starmap(Stream):
-    """ Apply a function to every element in the stream, splayed out
+    """
+    Apply a function to every element in the stream, splayed out.
 
     See ``itertools.starmap``
 
@@ -839,7 +865,8 @@ def _truthy(x):
 
 @ Stream.register_api()
 class filter(Stream):
-    """ Only pass through elements that satisfy the predicate
+    """
+    Only pass through elements that satisfy the predicate.
 
     Parameters
     ----------
@@ -883,7 +910,8 @@ class filter(Stream):
 
 @Stream.register_api()
 class accumulate(Stream):
-    """ Accumulate results with previous state
+    """
+    Accumulate results with previous state.
 
     This performs running or cumulative reductions, applying the function
     to the previous total and the new element.  The function should take
@@ -1046,7 +1074,8 @@ class slice(Stream):
 
 @Stream.register_api()
 class partition(Stream):
-    """ Partition stream into tuples of equal size
+    """
+    Partition stream into tuples of equal size.
 
     Examples
     --------
@@ -1077,7 +1106,8 @@ class partition(Stream):
 
 @Stream.register_api()
 class sliding_window(Stream):
-    """ Produce overlapping tuples of size n
+    """
+    Produce overlapping tuples of size n.
 
     Parameters
     ----------
@@ -1126,7 +1156,8 @@ def convert_interval(interval):
 
 @Stream.register_api()
 class timed_window(Stream):
-    """ Emit a tuple of collected results every interval
+    """
+    Emit a tuple of collected results every interval.
 
     Every ``interval`` seconds this emits a tuple of all of the results
     seen so far.  This can help to batch data coming off of a high-volume
@@ -1163,7 +1194,9 @@ class timed_window(Stream):
 
 @Stream.register_api()
 class delay(Stream):
-    """ Add a time delay to results """
+    """
+    Add a time delay to results.
+    """
 
     _graphviz_shape = 'octagon'
 
@@ -1195,7 +1228,8 @@ class delay(Stream):
 
 @Stream.register_api()
 class rate_limit(Stream):
-    """ Limit the flow of data
+    """
+    Limit the flow of data.
 
     This stops two elements of streaming through in an interval shorter
     than the provided value.
@@ -1226,7 +1260,8 @@ class rate_limit(Stream):
 
 @Stream.register_api()
 class buffer(Stream):
-    """ Allow results to pile up at this point in the stream
+    """
+    Allow results to pile up at this point in the stream.
 
     This allows results to buffer in place at various points in the stream.
     This can help to smooth flow through the system when backpressure is
@@ -1258,7 +1293,8 @@ class buffer(Stream):
 
 @Stream.register_api()
 class zip(Stream):
-    """ Combine streams together into a stream of tuples
+    """
+    Combine streams together into a stream of tuples.
 
     We emit a new tuple once all streams have produce a new tuple.
 
@@ -1303,7 +1339,9 @@ class zip(Stream):
         super(zip, self)._remove_upstream(upstream)
 
     def pack_literals(self, tup):
-        """ Fill buffers for literals whenever we empty them """
+        """
+        Fill buffers for literals whenever we empty them.
+        """
         inp = list(tup)[::-1]
         out = []
         for i, val in self.literals:
@@ -1333,7 +1371,8 @@ class zip(Stream):
 
 @Stream.register_api()
 class combine_latest(Stream):
-    """ Combine multiple streams together to a stream of tuples
+    """
+    Combine multiple streams together to a stream of tuples.
 
     This will emit a new tuple of all of the most recent elements seen from
     any stream.
@@ -1407,7 +1446,8 @@ class combine_latest(Stream):
 
 @Stream.register_api()
 class flatten(Stream):
-    """ Flatten streams of lists or iterables into a stream of elements
+    """
+    Flatten streams of lists or iterables into a stream of elements.
 
     Examples
     --------
@@ -1441,7 +1481,8 @@ class flatten(Stream):
 
 @Stream.register_api()
 class unique(Stream):
-    """ Avoid sending through repeated elements
+    """
+    Avoid sending through repeated elements.
 
     This deduplicates a stream so that only new elements pass through.
     You can control how much of a history is stored with the ``history=``
@@ -1515,7 +1556,8 @@ class unique(Stream):
 
 @Stream.register_api()
 class union(Stream):
-    """ Combine multiple streams into one
+    """
+    Combine multiple streams into one.
 
     Every element from any of the upstreams streams will immediately flow
     into the output stream.  They will not be combined with elements from
@@ -1536,7 +1578,8 @@ class union(Stream):
 
 @Stream.register_api()
 class pluck(Stream):
-    """ Select elements from elements in the stream.
+    """
+    Select elements from elements in the stream.
 
     Parameters
     ----------
@@ -1610,7 +1653,8 @@ class collect(Stream):
 
 @Stream.register_api()
 class zip_latest(Stream):
-    """Combine multiple streams together to a stream of tuples
+    """
+    Combine multiple streams together to a stream of tuples.
 
     The stream which this is called from is lossless. All elements from
     the lossless stream are emitted reguardless of when they came in.
@@ -1652,7 +1696,8 @@ class zip_latest(Stream):
 
 @Stream.register_api()
 class latest(Stream):
-    """ Drop held-up data and emit the latest result
+    """
+    Drop held-up data and emit the latest result.
 
     This allows you to skip intermediate elements in the stream if there is
     some back pressure causing a slowdown.  Use this when you only care about
@@ -1693,7 +1738,8 @@ class latest(Stream):
 
 @Stream.register_api()
 class to_kafka(Stream):
-    """ Writes data in the stream to Kafka
+    """
+    Writes data in the stream to Kafka
 
     This stream accepts a string or bytes object. Call ``flush`` to ensure all
     messages are pushed. Responses from Kafka are pushed downstream.

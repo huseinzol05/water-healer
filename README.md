@@ -8,7 +8,7 @@
 
 **water-healer**, Forked of Streamz to update Kafka consumer offset for every successful sink.
 
-This library also added streaming metrics, auto-shutdown, auto-graceful, unique emit ID, checkpointing and additional functions to stream pipeline.
+This library also added streaming metrics, auto-shutdown, auto-graceful, unique emit ID, checkpointing and additional functions to stream pipeline. Only compatible with `streamz==0.5.2`.
 
 <p align="left">
 <a href="https://github.com/hhatto/autopep8"><img alt="Code style: autopep8" src="https://img.shields.io/badge/code%20style-autopep8-000000.svg"></a>

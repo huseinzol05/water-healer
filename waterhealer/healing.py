@@ -1,7 +1,7 @@
 from tornado import gen
 from datetime import datetime
-from waterhealer.core import Stream, convert_interval, logger
-from waterhealer.function import (
+from .core import Stream, convert_interval, logger
+from .function import (
     topic_partition_str,
     str_topic_partition,
     get_memory,

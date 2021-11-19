@@ -1,9 +1,9 @@
-from waterhealer.core import Stream, convert_interval
+from .core import Stream, convert_interval
+from .function import topic_partition_str
 from tornado import gen
 from itertools import cycle
 from collections import defaultdict
 from expiringdict import ExpiringDict
-from waterhealer.function import topic_partition_str
 from datetime import datetime
 import confluent_kafka as ck
 import logging

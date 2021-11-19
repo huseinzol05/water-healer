@@ -1,5 +1,5 @@
 import functools
-from .core import logging
+from .core import logger
 from .function import topic_partition_offset_str, str_topic_partition_offset
 
 
@@ -60,7 +60,7 @@ def check_leakage(func):
                        'before': before_uuid,
                        'after': after_uuid,
                        'leaking': True}
-            logging.exception(message)
+            logger.exception(message)
             raise Exception(f'{func_name} leaking')
 
         return value
