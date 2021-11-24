@@ -508,7 +508,7 @@ Check example at [json-logging-emit-id-check-leakage.ipynb](example/json-logging
 
 ### checker
 
-* [waterhealer.checker.checkleakage](#waterhealercheckercheckleakage)
+* [waterhealer.checker.check_leakage](#waterhealercheckercheck_leakage)
 
 #### check_leakage
 
