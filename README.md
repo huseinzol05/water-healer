@@ -380,8 +380,8 @@ Default is `false`, if you enable it,
 For example,
 
 - [json-logging-emit-id.ipynb](example/json-logging-emit-id.ipynb).
-- with kafka example [simple-plus-element-emit-id.ipynb](example/simple-plus-element-emit-id.ipynb).
-- with Dask cluster example [dask-emit-id.ipynb](example/dask-emit-id.ipynb).
+- with kafka example, [simple-plus-element-emit-id.ipynb](example/simple-plus-element-emit-id.ipynb).
+- with Dask cluster example, [dask-emit-id.ipynb](example/dask-emit-id.ipynb).
 
 ### Remote logging
 
@@ -464,7 +464,7 @@ Checkpointing also can put on `zip`, `sink`, and other interfaces.
 For example,
 
 - [checkpointing.ipynb](example/checkpointing.ipynb).
-- including Dask checkpointing on [dask-checkpointing.ipynb](example/dask-checkpointing.ipynb).
+- with Dask checkpointing, [dask-checkpointing.ipynb](example/dask-checkpointing.ipynb).
 
 #### disable checkpointing using OS environment
 
