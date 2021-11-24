@@ -134,7 +134,7 @@ On fourth polling, we should pull back `offset` 2, not proceed
 
 ### update offset for distributed processing
 
-In a real world, some of realtime functions really took a long, maybe caused some long polling like merging data from database or waiting some events.
+In a real world, some of realtime functions might take some time, maybe caused some long polling like merging data from database or waiting some events.
 
 Let say we have a single stream and 3 workers can execute a function in parallel manner, the function simply like,
 
@@ -164,7 +164,7 @@ The queue be like, FIFO,
 queue = [3, 2, 1]
 ```
 
-Offset `3` comes first, but the problem here, offset `1` got error and we don't want to simply update offset `3` because it came first, we want to reprocess from offset `1`.
+Offset `3` comes first, but the problem here, offset `1` got error and we do not want to simply update offset `3` because it came first, we want to reprocess from offset `1`.
 
 So, water-healer will wait offset `1` first, after that will execute offset `2` and `3`.
 
