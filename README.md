@@ -26,27 +26,28 @@ This library also added streaming metrics, auto-shutdown, auto-graceful, unique 
     * [auto shutdown](#auto-shutdown)
     * [auto graceful delete](#auto-graceful-delete)
     * [JSON logging with unique emit ID](#JSON-logging-with-unique-emit-ID)
+    * [Remote logging](#Remote-logging)
     * [checkpointing](#checkpointing)
       * [disable checkpointing using OS environment](#disable-checkpointing-using-os-environment)
     * [check leakage on offsets](#check-leakage-on-offsets)
-  * [Usage](#Usage)
+  * [API](#API)
     * [checker](#checker)
-      * [check_leakage](#check_leakage)
+      * [waterhealer.checker.check_leakage](#waterhealercheckercheck_leakage)
     * [core](#extension)
-      * [partition_time](#partition_time)
-      * [foreach_map](#foreach_map)
-      * [foreach_async](#foreach_async)
+      * [waterhealer.core.partition_time](#waterhealercorepartition_time)
+      * [waterhealer.core.foreach_map](#waterhealercoreforeach_map)
+      * [waterhealer.core.foreach_async](#waterhealercoreforeach_async)
+    * [dask_plugin](#dask_plugin)
+      * [waterhealer.dask_plugin.remote_logging](#waterhealerdaskpluginremote_logging)
     * [healing](#healing)
-      * [waterhealer.healing](#waterhealerhealing)
+      * [waterhealer.healing.healing](#waterhealerhealinghealing)
+      * [waterhealer.healing.auto_shutdown](#waterhealerhealingauto_shutdown)
     * [kafka](#kafka)
-      * [waterhealer.from_kafka](#waterhealerfrom_kafka)
-      * [waterhealer.from_kafka_batched](#waterhealerfrom_kafka_batched)
-      * [waterhealer.from_kafka_batched_scatter](#waterhealerfrom_kafka_batched_scatter)
-    * [plugin](#plugin)
-      * [waterhealer.plugin.error_logging](#waterhealerpluginerror_logging)
+      * [waterhealer.kafka.from_kafka](#waterhealerkafkafrom_kafka)
+      * [waterhealer.kafka.from_kafka_batched](#waterhealerkafkafrom_kafka_batched)
+      * [waterhealer.kafka.from_kafka_batched_scatter](#waterhealerkafkafrom_kafka_batched_scatter)
     * [source](#source)
       * [waterhealer.metrics](#waterhealermetrics)
-      * [waterhealer.auto_shutdown](#waterhealerauto_shutdown)
   * [Examples](#Examples)
   * [What is the pain points?](#What-is-the-pain-points)
 
@@ -378,6 +379,50 @@ Default is `false`, if you enable it,
 
 For example, check [json-logging-emit-id.ipynb](example/json-logging-emit-id.ipynb), or with kafka example [simple-plus-element-emit-id.ipynb](example/simple-plus-element-emit-id.ipynb), or with Dask cluster example [dask-emit-id.ipynb](example/dask-emit-id.ipynb).
 
+### Remote logging
+
+When come to distributed real time processing, it is very hard to store the variables that caused the streaming halt and we wish we can inspect the variables in playground environment. water-healer included simple Dask plugin to do remote logging,
+
+First, you need to create a logging class, simple as,
+
+```python
+from datetime import datetime
+
+class Persistent:
+    def __init__(self):
+        # initiate GCS / S3 client
+        pass
+    
+    def persist(self, data, now):
+        """
+        data: Dict[function, args, kwargs, exception, error, key]
+        timestamp: datetime.datetime
+            from `datetime.now()`.
+        """
+        now = datetime.strftime(now, '%y-%m-%d-%H-%M-%S')
+        with open(f"{data['function']}-{now}.json", 'w') as fopen:
+            json.dump(data, fopen)
+
+        # also can do webhook for real time alert
+```
+
+The logging class must have `persist` method or else water-healer will throw an error. To initiate the logging class as Dask plugin,
+
+```python
+from dask.distributed import Client
+client = Client()
+source = Stream()
+wh.dask_plugin.remote_logging(client, Persistent)
+```
+
+Example output [__main__.combine-21-11-24-18-56-52.json](example/__main__.combine-21-11-24-18-56-52.json),
+
+```text
+{"function": "__main__.combine", "args": [[[{"i": 3, "data": 4, "left": 5}, {"i": 4, "data": 5, "left": 6}], [{"i": 3, "data": 4, "right": 5}, {"i": 4, "data": 5, "right": 6}]]], "kwargs": [], "exception": ["  File \"<ipython-input-7-b696a701b986>\", line 24, in combine\n    raise Exception('error')\n"], "error": "error", "key": "combine--1efd1c43-36c3-4cf4-93f5-3152287c9251--8432e1d8-1488-4986-9f85-d373360fe491", "emit_id": "1efd1c43-36c3-4cf4-93f5-3152287c9251"}
+```
+
+For example, check [dask-plugin-remote-logging.ipynb](example/dask-plugin-remote-logging.ipynb)
+
 ### checkpointing
 
 Let say every emit, I want to store value from each nodes returned, example as,
@@ -459,9 +504,11 @@ Check example at [json-logging-emit-id-check-leakage.ipynb](example/json-logging
 
 **`wh.checker.check_leakage` will raised an exception if found a leakage**.
 
-## Usage
+## API
 
 ### checker
+
+* [waterhealer.checker.checkleakage](#waterhealercheckercheckleakage)
 
 #### check_leakage
 
@@ -478,11 +525,11 @@ def check_leakage(func):
 
 ### core
 
-* [partition_time](#partition_time)
-* [foreach_map](#foreach_map)
-* [foreach_async](#foreach_async)
+* [waterhealer.core.partition_time](#waterhealercorepartition_time)
+* [waterhealer.core.foreach_map](#waterhealercoreforeach_map)
+* [waterhealer.core.foreach_async](#waterhealercoreforeach_async)
 
-#### partition_time
+#### waterhealer.core.partition_time
 
 ```python
 class partition_time(Stream):
@@ -504,7 +551,7 @@ This is different from [partition](https://streamz.readthedocs.io/en/latest/api.
 
 `partition` only proceed to next flow if size is equal to `n`. But for `partition_time`, if waiting time is expired, it will proceed, does not care about the size, and expired time only calculated when an element came in.
 
-#### foreach_map
+#### waterhealer.core.foreach_map
 
 ```python
 class foreach_map(Stream):
@@ -530,7 +577,7 @@ class foreach_map(Stream):
 
 It is like `map`, but do `map` for each elements in a batch in sequential manner.
 
-#### foreach_async
+#### waterhealer.core.foreach_async
 
 ```python
 class foreach_async(Stream):
@@ -568,13 +615,38 @@ source.partition(5).foreach_async(lambda x: 2*x).sink(print)
 
 Example, [foreach-async.ipynb](example/foreach-async.ipynb)
 
+### dask_plugin
+
+* [waterhealer.dask_plugin.remote_logging](waterhealerdask_pluginremote_logging)
+
+#### waterhealer.dask_plugin.remote_logging
+
+```python
+def remote_logging(client, persistent_class,
+                   status_finish: List[str] = ['error'],
+                   plugin_name: str = 'error-logging'):
+    """
+    Remote logging for dask worker using dask plugin.
+    Only support dask>=2021.1.0 and distributed>=2021.1.0
+
+    Parameters
+    ----------
+    client: distributed.client.Client
+    persistent_class: class
+        Must have `persist` and `constructor` methods.
+    status_finish: List[str], optional (default=['error'])
+    plugin_name: str, optional (default='error-logging')
+        Name for plugin.
+    """
+```
+
 ### kafka
 
-* [waterhealer.from_kafka](#waterhealerfrom_kafka)
-* [waterhealer.from_kafka_batched](#waterhealerfrom_kafka_batched)
-* [waterhealer.from_kafka_batched_scatter](#waterhealerfrom_kafka_batched_scatter)
+* [waterhealer.kafka.from_kafka](#waterhealerkafkafrom_kafka)
+* [waterhealer.kafka.from_kafka_batched](#waterhealerkafkafrom_kafka_batched)
+* [waterhealer.kafla.from_kafka_batched_scatter](#waterhealerkafkafrom_kafka_batched_scatter)
 
-#### waterhealer.from_kafka
+#### waterhealer.kafka.from_kafka
 
 ```python
 class from_kafka(Source):
@@ -628,7 +700,7 @@ Example, [simple-plus-element.ipynb](example/simple-plus-element.ipynb).
 
 **Output from `waterhealer.from_kafka` is different from any sources object from `streamz`, `streamz` only returned `value`, not tuple as `waterhealer.from_kafka`.**
 
-#### waterhealer.from_kafka_batched
+#### waterhealer.kafka.from_kafka_batched
 
 ```python
 class from_kafka_batched(Source):
@@ -666,7 +738,7 @@ class from_kafka_batched(Source):
 
 Same as `waterhealer.from_kafka`, but we pulled partitions in parallel manners.
 
-#### waterhealer.from_kafka_batched_scatter
+#### waterhealer.kafka.from_kafka_batched_scatter
 
 ```python
 def from_kafka_batched_scatter(
@@ -711,9 +783,10 @@ Example, [simple-plus-element-kafka-scatter.ipynb](example/simple-plus-element-k
 
 ### healing
 
-* [waterhealer.healing](#waterhealerhealing)
+* [waterhealer.healing.healing](#waterhealerhealinghealing)
+* [waterhealer.healing.auto_shutdown](#waterhealerhealingauto_shutdown)
 
-#### waterhealer.healing
+#### waterhealer.healing.healing
 
 ```python
 class healing(Stream):
@@ -750,12 +823,50 @@ Partial code can be like this,
 
 Example, [simple-plus-element.ipynb](example/simple-plus-element.ipynb)
 
+#### waterhealer.healing.auto_shutdown
+
+```python
+def auto_shutdown(
+    source,
+    got_error: bool = True,
+    got_dask: bool = True,
+    graceful_offset: int = 3600,
+    graceful_polling: int = 1800,
+    interval: int = 5,
+    sleep_before_shutdown: int = 2,
+    auto_expired: int = 10800,
+):
+    """
+
+    Parameters
+    ----------
+    source: waterhealer.core.Stream
+        waterhealer.core.Stream object
+    got_error: bool, (default=True)
+        if dask streaming got an exception, automatically shutdown the script.
+    got_dask: bool, (default=True)
+        if True, will check Dask status, will shutdown if client status not in ('running','closing','connecting','newly-created').
+    graceful_offset: int, (default=3600)
+        automatically shutdown the script if water-healer not updated any offsets after `graceful_offset` period.
+        To disable it, set it to 0.
+    graceful_polling: int, (default=1800)
+        automatically shutdown the script if kafka consumer not polling after `graceful_polling` period.
+        To disable it, set it to 0.
+    interval: int, (default=5)
+        check heartbeat every `interval`.
+    sleep_before_shutdown: int, (defaut=2)
+        sleep (second) before shutdown.
+    auto_expired: int, (default=10800)
+        auto shutdown after `auto_expired`. Set to `0` to disable it.
+        This is to auto restart the python script to flush out memory leaks.
+    """
+```
+
 ### source
 
-* [waterhealer.metrics](#waterhealermetrics)
-* [waterhealer.auto_shutdown](#waterhealerauto_shutdown)
+* [waterhealer.source.metrics](#waterhealermetrics)
 
-#### waterhealer.metrics
+#### waterhealer.source.metrics
 
 ```python
 def metrics(
@@ -777,44 +888,6 @@ def metrics(
     port: int, (default=8000)
         default port for prometheus exporter.
         
-    """
-```
-
-#### waterhealer.auto_shutdown
-
-```python
-def auto_shutdown(
-    source,
-    got_error: bool = True,
-    got_dask: bool = True,
-    graceful_offset: int = 3600,
-    graceful_polling: int = 1800,
-    interval: int = 5,
-    sleep_before_shutdown: int = 2,
-    auto_expired: int = 5400,
-):
-    """
-
-    Parameters
-    ----------
-    source: source object
-        async streamz source.
-    got_error: bool, (default=True)
-        if dask streaming got an exception, automatically shutdown the script.
-    got_dask: bool, (default=True)
-        if True, will check Dask status, will shutdown if client status not in ('running','closing','connecting','newly-created').
-    graceful_offset: int, (default=3600)
-        automatically shutdown the script if water-healer not updated any offsets after `graceful_offset` period. 
-        To disable it, set it to 0.
-    graceful_polling: int, (default=1800)
-        automatically shutdown the script if kafka consumer not polling after `graceful_polling` period. 
-        To disable it, set it to 0.
-    interval: int, (default=5)
-        check heartbeat every `interval`. 
-    sleep_before_shutdown: int, (defaut=2)
-        sleep (second) before shutdown.
-    auto_expired: int, (default=5400)
-        auto shutdown after `auto_expired`. Set to `0` to disable it.
     """
 ```
 

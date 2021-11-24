@@ -18,6 +18,11 @@ def check_leakage(func):
     Check leakage for kafka offsets, only support below structure of data,
     1. List[Tuple[uuid, data]]
     2. List[Dict[uuid, **data]]
+
+    Parameters
+    ----------
+    func: callable
+        python function.
     """
     @functools.wraps(func)
     def wrapper_decorator(*args, **kwargs):

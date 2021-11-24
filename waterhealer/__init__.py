@@ -3,7 +3,7 @@ from .core import *
 from .dask import *
 from .healing import healing, auto_shutdown
 from . import checker
-from . import plugin
+from . import dask_plugin
 from .source import metrics
 
 __version__ = '0.1.5'
