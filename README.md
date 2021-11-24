@@ -199,7 +199,7 @@ source.healing()
 
 We need to use `waterhealer.from_kafka` for streaming source, and use `waterhealer.healing` for sinking or mapping process.
 
-Simply can read more about [waterhealer.from_kafka](#waterhealerfrom_kafka) and [waterhealer.healing](#waterhealerhealing)
+Simply can read more about [waterhealer.from_kafka](#waterhealerkafkafrom_kafka) and [waterhealer.healing](#waterhealerhealinghealing)
 
 ### streaming metrics
 
@@ -268,7 +268,7 @@ data_size_after_histogram = Histogram(
 )
 ```
 
-If you check [localhost:8000](http://localhost:8000),
+If you check http://localhost:8000,
 
 ```text
 total_time_source__inc_count 1.0
@@ -279,7 +279,7 @@ total_time_source__inc__print_count 1.0
 
 `source__inc__print`, as definition source -> inc() -> print() .
 
-We use `sys.getsizeof` to calculate data size, so, we might expect some headcost. By default metrics for time execution and data size will enable, to disable it, simply check [waterhealer.metrics](#waterhealermetrics).
+We use `sys.getsizeof` to calculate data size, so, we might expect some headcost. By default metrics for time execution and data size will enable, to disable it, simply check [waterhealer.source.metrics](#waterhealersourcemetrics).
 
 ### auto shutdown
 
@@ -377,7 +377,11 @@ Default is `false`, if you enable it,
 {"written_at": "2021-11-11T05:30:40.215Z", "written_ts": 1636608640215408000, "msg": "need to combine", "type": "log", "logger": "root", "thread": "MainThread", "level": "INFO", "module": "<ipython-input-5-554c07df66f4>", "line_no": 35, "function_name": "map.combine", "emit_id": "9e2ecc23-6419-4a94-84a5-6b1cb748590e"}
 ```
 
-For example, check [json-logging-emit-id.ipynb](example/json-logging-emit-id.ipynb), or with kafka example [simple-plus-element-emit-id.ipynb](example/simple-plus-element-emit-id.ipynb), or with Dask cluster example [dask-emit-id.ipynb](example/dask-emit-id.ipynb).
+For example,
+
+- [json-logging-emit-id.ipynb](example/json-logging-emit-id.ipynb).
+- with kafka example [simple-plus-element-emit-id.ipynb](example/simple-plus-element-emit-id.ipynb).
+- with Dask cluster example [dask-emit-id.ipynb](example/dask-emit-id.ipynb).
 
 ### Remote logging
 
@@ -421,7 +425,9 @@ Example output [__main__.combine-21-11-24-18-56-52.json](example/__main__.combin
 {"function": "__main__.combine", "args": [[[{"i": 3, "data": 4, "left": 5}, {"i": 4, "data": 5, "left": 6}], [{"i": 3, "data": 4, "right": 5}, {"i": 4, "data": 5, "right": 6}]]], "kwargs": [], "exception": ["  File \"<ipython-input-7-b696a701b986>\", line 24, in combine\n    raise Exception('error')\n"], "error": "error", "key": "combine--1efd1c43-36c3-4cf4-93f5-3152287c9251--8432e1d8-1488-4986-9f85-d373360fe491", "emit_id": "1efd1c43-36c3-4cf4-93f5-3152287c9251"}
 ```
 
-For example, check [dask-plugin-remote-logging.ipynb](example/dask-plugin-remote-logging.ipynb)
+For example,
+
+- [dask-plugin-remote-logging.ipynb](example/dask-plugin-remote-logging.ipynb).
 
 ### checkpointing
 
@@ -455,9 +461,10 @@ Output is,
 
 Checkpointing also can put on `zip`, `sink`, and other interfaces.
 
-Check example at [checkpointing.ipynb](example/checkpointing.ipynb).
+For example,
 
-More extensive example including Dask checkpointing on [dask-checkpointing.ipynb](example/dask-checkpointing.ipynb).
+- [checkpointing.ipynb](example/checkpointing.ipynb).
+- including Dask checkpointing on [dask-checkpointing.ipynb](example/dask-checkpointing.ipynb).
 
 #### disable checkpointing using OS environment
 
@@ -500,7 +507,9 @@ def func(rows):
 1. `List[Tuple[uuid, data]]`.
 2. `List[Dict[uuid, **data]]`.
 
-Check example at [json-logging-emit-id-check-leakage.ipynb](example/json-logging-emit-id-check-leakage).
+For example,
+
+- [json-logging-emit-id-check-leakage.ipynb](example/json-logging-emit-id-check-leakage).
 
 **`wh.checker.check_leakage` will raised an exception if found a leakage**.
 
