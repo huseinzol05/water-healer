@@ -92,48 +92,59 @@ class healing(Stream):
         logger.info(f'healing successful: {success}, {now}')
         return success
 
+    def get_source_consumer(self):
+        if self.consumer is None:
+            _, self.consumer, self.memory = get_memory(self.upstreams[0])
+        return self.consumer is not None
+
     @gen.coroutine
     def cb(self):
         while True:
-            if self.consumer is None:
-                _, self.consumer, self.memory = get_memory(self.upstreams[0])
-            for topic_partition in self.memory.keys():
-                topic, partition = str_topic_partition(topic_partition)
-                if len(self.memory[topic_partition]):
-                    while True:
-                        try:
-                            low_offset, high_offset = self.consumer.get_watermark_offsets(
-                                ck.TopicPartition(topic, partition)
-                            )
-                            current_offset = self.consumer.committed(
-                                [ck.TopicPartition(topic, partition)]
-                            )[0].offset
-                            break
-                        except Exception as e:
-                            logger.warning(e)
-                    for offset in sorted(self.memory[topic_partition].keys()):
-                        if self.memory[topic_partition][offset]:
-                            if current_offset >= high_offset:
-                                logger.warning(
-                                    f'topic partition: {topic_partition}, offset: {offset}, current offset already same as high offset')
-                            elif offset < current_offset:
-                                logger.warning(
-                                    f'topic partition: {topic_partition}, offset: {offset}, current offset higher than message offset')
-                            else:
-                                self.partitions.append(
-                                    ck.TopicPartition(topic, partition, offset + 1)
+            started = self.get_source_consumer()
+            if started:
+                delete_from_memory = []
+                for topic_partition in self.memory.keys():
+                    topic, partition = str_topic_partition(topic_partition)
+                    if len(self.memory[topic_partition]):
+                        while True:
+                            try:
+                                low_offset, high_offset = self.consumer.get_watermark_offsets(
+                                    ck.TopicPartition(topic, partition)
                                 )
-                        else:
-                            break
+                                current_offset = self.consumer.committed(
+                                    [ck.TopicPartition(topic, partition)]
+                                )[0].offset
+                                break
+                            except Exception as e:
+                                logger.warning(e)
 
-            if self.commit():
-                L = []
-                for p in self.partitions:
+                        for offset in sorted(self.memory[topic_partition].keys()):
+                            if self.memory[topic_partition][offset]:
+                                if offset < current_offset:
+                                    logger.warning(
+                                        f'topic partition: {topic_partition}, offset: {offset}, current offset: {current_offset}, current offset higher than message offset')
+                                    delete_from_memory.append(
+                                        ck.TopicPartition(topic, partition, offset + 1)
+                                    )
+                                else:
+                                    self.partitions.append(
+                                        ck.TopicPartition(topic, partition, offset + 1)
+                                    )
+                            else:
+                                break
+
+                if self.commit():
+                    L = []
+                    for p in self.partitions:
+                        self.memory[topic_partition_str(p.topic, p.partition)].pop(p.offset - 1)
+                        L.append({'topic': p.topic, 'partition': p.partition, 'offset': p.offset - 1})
+                    self.last = self._emit(L, emit_id=self.last_emit_id)
+                    self.partitions = []
+                    self.last_emit_id = None
+
+                for p in delete_from_memory:
                     self.memory[topic_partition_str(p.topic, p.partition)].pop(p.offset - 1)
-                    L.append({'topic': p.topic, 'partition': p.partition, 'offset': p.offset - 1})
-                self.last = self._emit(L, emit_id=self.last_emit_id)
-                self.partitions = []
-                self.last_emit_id = None
+
             yield self.last
             yield gen.sleep(self.interval)
 

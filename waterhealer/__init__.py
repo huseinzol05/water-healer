@@ -6,4 +6,4 @@ from . import checker
 from . import dask_plugin
 from .source import metrics
 
-__version__ = '0.1.5'
+__version__ = '0.1.6'

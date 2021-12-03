@@ -39,4 +39,12 @@ services:
       - "8085:8080"
     environment:
       KAFKA_BROKERS: 'broker:9092'
+  
+  redis:
+    restart: always
+    image: redis:6.2.5-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+
 

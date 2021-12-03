@@ -1,12 +1,10 @@
 import sys
 import functools
+from .core import logger
 from prometheus_client import start_http_server, Counter, Summary, Histogram
 from distributed.client import default_client
 from time import time
-import logging
 from tornado import gen
-
-logger = logging.getLogger(__name__)
 
 
 def _evolve(

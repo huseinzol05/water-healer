@@ -705,7 +705,7 @@ Data structure of uuid,
 
 If you want to use waterhealer, you need to make sure `uuid` from `from_kafka` succesfully transported until healing, or else it cannot update the offset.
 
-Example, [simple-plus-element.ipynb](example/simple-plus-element.ipynb).
+Example, [simple-plus-element-kafka.ipynb](example/simple-plus-element-kafka.ipynb).
 
 **Output from `waterhealer.from_kafka` is different from any sources object from `streamz`, `streamz` only returned `value`, not tuple as `waterhealer.from_kafka`.**
 
@@ -830,7 +830,7 @@ Partial code can be like this,
   {'topic': 'testing', 'partition': 3, 'offset': 49}]
 ```
 
-Example, [simple-plus-element.ipynb](example/simple-plus-element.ipynb)
+Example, [simple-plus-element-kafka.ipynb](example/simple-plus-element-kafka.ipynb)
 
 #### waterhealer.healing.auto_shutdown
 

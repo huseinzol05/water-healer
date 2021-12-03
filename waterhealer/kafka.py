@@ -1,15 +1,15 @@
-from .core import Stream, convert_interval
+from .core import Stream, convert_interval, logger
 from .function import topic_partition_str
+from .utils.redis import DictHealer
 from tornado import gen
 from itertools import cycle
 from collections import defaultdict
 from expiringdict import ExpiringDict
 from datetime import datetime
+from redis import StrictRedis
+from typing import List, Dict
 import confluent_kafka as ck
-import logging
 import time
-
-logger = logging.getLogger(__name__)
 
 
 class Source(Stream):
@@ -31,15 +31,37 @@ def _close_consumer(consumer):
         pass
 
 
+class KafkaOffset:
+    def __init__(
+        self,
+        redis: StrictRedis = None,
+        maxlen_memory: int = 10_000_000,
+        maxage_memory: int = 3600,
+        redis_key: str = 'water-healer-from_kafka',
+    ):
+
+        self.redis = redis
+        if redis is not None:
+            self.memory = DictHealer(redis=redis, consumer=self.cpars['group.id'], key=redis_key)
+            logger.info(f"Use Redis memory with consumer={self.cpars['group.id']}, key={redis_key}")
+        else:
+            self.memory = defaultdict(
+                lambda: ExpiringDict(
+                    max_len=maxlen_memory, max_age_seconds=maxage_memory
+                )
+            )
+            logger.info(f'Use local ExpiringDict memory with max_len={maxlen_memory}, max_age_seconds={maxage_memory}')
+
+
 @Stream.register_api(staticmethod)
-class from_kafka(Source):
+class from_kafka(Source, KafkaOffset):
     """
 
     Parameters
     ----------
-    topics: list of str
-        Labels of Kafka topics to consume from
-    consumer_params: dict
+    topics: List[str]
+        Labels of Kafka topics to consume from.
+    consumer_params: Dict
         Settings to set up the stream, see
         https://docs.confluent.io/current/clients/confluent-kafka-python/#configuration
         https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
@@ -48,27 +70,43 @@ class from_kafka(Source):
         Kafka;
         group.id, Identity of the consumer. If multiple sources share the same
         group, each message will be passed to only one of them.
-    poll_interval: number
-        Seconds that elapse between polling Kafka for new messages
-    start: bool, (default=False)
+    poll_interval: float, optional (default=0.1)
+        Seconds that elapse between polling Kafka for new messages.
+    start: bool, optional (default=False)
         Whether to start polling upon instantiation
-    maxlen_memory: int, (default=10_000_000)
+    redis: redis.StrictRedis, optional (default=None)
+        if provided, memory will initiate using Redis.
+        Else, will use `ExpiringDict`.
+    maxlen_memory: int, optional (default=10_000_000)
         max length of topic and partition dictionary for healing process.
-    maxage_memory: int, (default=3600)
+        Only useful if Redis is None.
+    maxage_memory: int, optional (default=3600)
         max age for a partition stay in topic and partition dictionary.
+        Only useful if Redis is None.
+    redis_key: str, optional (default='water-healer-from_kafka')
+        Unique identifier for Redis key.
     """
 
     def __init__(
         self,
-        topics,
-        consumer_params,
-        poll_interval=0.1,
-        start=False,
-        maxlen_memory=10_000_000,
-        maxage_memory=3600,
+        topics: List[str],
+        consumer_params: Dict,
+        poll_interval: float = 0.1,
+        start: bool = False,
+        redis: StrictRedis = None,
+        maxlen_memory: int = 10_000_000,
+        maxage_memory: int = 3600,
+        redis_key: str = 'water-healer-from_kafka',
         **kwargs,
     ):
         self.cpars = consumer_params
+        KafkaOffset.__init__(
+            self,
+            redis=redis,
+            maxlen_memory=maxlen_memory,
+            maxage_memory=maxage_memory,
+            redis_key=redis_key,
+        )
         self.cpars['enable.auto.commit'] = False
         self.consumer = None
         self.topics = topics
@@ -78,11 +116,7 @@ class from_kafka(Source):
 
         if start:
             self.start()
-        self.memory = defaultdict(
-            lambda: ExpiringDict(
-                max_len=maxlen_memory, max_age_seconds=maxage_memory
-            )
-        )
+
         self.last_poll = datetime.now()
 
     def do_poll(self):
@@ -109,7 +143,13 @@ class from_kafka(Source):
                     f'topic: {topic}, partition: {partition}, offset: {offset}, data: {val}'
                 )
 
-                self.memory[topic_partition_str(topic, partition)][
+                topic_partition = topic_partition_str(topic, partition)
+
+                if self.redis is not None:
+                    if self.memory[topic_partition].get(offset):
+                        continue
+
+                self.memory[topic_partition][
                     offset
                 ] = False
 
@@ -143,14 +183,14 @@ class from_kafka(Source):
 
 
 @Stream.register_api(staticmethod)
-class from_kafka_batched(Source):
+class from_kafka_batched(Source, KafkaOffset):
     """
 
     Parameters
     ----------
-    topics: list of str
-        Labels of Kafka topics to consume from
-    consumer_params: dict
+    topics: List[str]
+        Labels of Kafka topics to consume from.
+    consumer_params: Dict
         Settings to set up the stream, see
         https://docs.confluent.io/current/clients/confluent-kafka-python/#configuration
         https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
@@ -159,33 +199,49 @@ class from_kafka_batched(Source):
         Kafka;
         group.id, Identity of the consumer. If multiple sources share the same
         group, each message will be passed to only one of them.
-    batch_size: int
-        batch size of polling
-    batch_timeout: number
-        timeout for batching if not reach size `batch_size`
-    poll_interval: number
-        Seconds that elapse between polling Kafka for new messages
-    start: bool, (default=False)
-        Whether to start polling upon instantiation
-    maxlen_memory: int, (default=10_000_000)
+    batch_size: int, optional (default=100)
+        batch size of polling.
+    batch_timeout: float, optional (default=10)
+        timeout for batching if not reach size `batch_size`.
+    poll_interval: float, optional (default=0.1)
+        Seconds that elapse between polling Kafka for new messages.
+    start: bool, optional (default=False)
+        Whether to start polling upon instantiation.
+    redis: redis.StrictRedis, optional (default=None)
+        if provided, memory will initiate using Redis.
+        Else, will use `ExpiringDict`.
+    maxlen_memory: int, optional (default=10_000_000)
         max length of topic and partition dictionary for healing process.
-    maxage_memory: int, (default=3600)
+        Only useful if Redis is None.
+    maxage_memory: int, optional (default=3600)
         max age for a partition stay in topic and partition dictionary.
+        Only useful if Redis is None.
+    redis_key: str, optional (default='water-healer-from_kafka_batched')
+        Unique identifier for Redis key.
     """
 
     def __init__(
         self,
-        topics,
-        consumer_params,
-        batch_size=100,
-        batch_timeout=10,
-        poll_interval=0.1,
-        start=False,
-        maxlen_memory=10_000_000,
-        maxage_memory=3600,
+        topics: List[str],
+        consumer_params: Dict,
+        batch_size: int = 100,
+        batch_timeout: float = 10,
+        poll_interval: float = 0.1,
+        start: bool = False,
+        redis: StrictRedis = None,
+        maxlen_memory: int = 10_000_000,
+        maxage_memory: int = 3600,
+        redis_key: str = 'water-healer-from_kafka_batched',
         **kwargs,
     ):
         self.cpars = consumer_params
+        KafkaOffset.__init__(
+            self,
+            redis=redis,
+            maxlen_memory=maxlen_memory,
+            maxage_memory=maxage_memory,
+            redis_key=redis_key,
+        )
         self.cpars['enable.auto.commit'] = False
         self.consumer = None
         self.topics = topics
@@ -200,11 +256,7 @@ class from_kafka_batched(Source):
 
         if start:
             self.start()
-        self.memory = defaultdict(
-            lambda: ExpiringDict(
-                max_len=maxlen_memory, max_age_seconds=maxage_memory
-            )
-        )
+
         self.last_poll = datetime.now()
 
     def do_poll(self):
@@ -239,6 +291,10 @@ class from_kafka_batched(Source):
                 logger.debug(
                     f'topic: {topic}, partition: {partition}, offset: {offset}, data: {val}'
                 )
+
+                if self.redis is not None:
+                    if self.memory[topic_partition].get(offset):
+                        continue
 
                 self.memory[topic_partition_str(topic, partition)][
                     offset
@@ -276,12 +332,12 @@ class FromKafkaBatched(Source):
 
     def __init__(
         self,
-        topics,
-        consumer_params,
-        poll_interval=10,
-        batch_size=1000,
-        maxlen_memory=10_000_000,
-        maxage_memory=3600,
+        topics: List[str],
+        consumer_params: Dict,
+        poll_interval: int = 10,
+        batch_size: int = 1000,
+        maxlen_memory: int = 10_000_000,
+        maxage_memory: int = 3600,
         **kwargs,
     ):
         self.consumer_params = consumer_params

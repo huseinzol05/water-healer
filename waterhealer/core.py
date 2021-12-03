@@ -78,6 +78,7 @@ thread_state = threading.local()
 _io_loops = []
 
 ENABLE_CHECKPOINTING = to_bool(os.environ.get('ENABLE_CHECKPOINTING', 'true'))
+ENABLE_EMIT_LOGGING = to_bool(os.environ.get('ENABLE_EMIT_LOGGING', 'true'))
 ENABLE_JSON_LOGGING = to_bool(os.environ.get('ENABLE_JSON_LOGGING', 'false'))
 LOGLEVEL = os.environ.get('LOGLEVEL', 'INFO')
 
@@ -505,8 +506,9 @@ class Stream(object):
         if hasattr(self, 'func'):
             name = f'{name}.{self.func.__name__}'
 
-        logger.info({'function_name': name, 'data': str(x)[:10000]},
-                    extra={'props': {'emit_id': emit_id}})
+        if ENABLE_EMIT_LOGGING:
+            logger.info({'function_name': name, 'data': str(x)[:10000]},
+                        extra={'props': {'emit_id': emit_id}})
 
         if self._checkpoint and ENABLE_CHECKPOINTING:
             self._climb(self, name, x)
