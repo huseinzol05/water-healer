@@ -6,7 +6,7 @@
 
 ---
 
-**water-healer**, Forked of Streamz to deliver processing guarantees at least once for Kafka consumers.
+**water-healer**, Forked of Streamz to deliver processed guarantees at least once for Kafka consumers.
 
 This library also added streaming metrics, auto-shutdown, auto-graceful, unique emit ID, checkpointing, remote logging and additional functions to stream pipeline. Only compatible with `streamz==0.5.2`.
 
