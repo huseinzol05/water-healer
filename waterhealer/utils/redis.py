@@ -7,15 +7,15 @@ class DictHealer:
         self.redis = redis
         self.consumer = consumer
         self.dict = Dict(redis=redis, key=key)
-        self.list_consumers = self.dict.get(consumer, '').split(',')
-        self.consumers = {c: Dict(redis=redis, key=f'{consumer}-{c}') for c in self.list_consumers}
+        self.list_partitions = self.dict.get(consumer, '').split(',')
+        self.partitions = {p: Dict(redis=redis, key=f'{consumer}-{p}') for p in self.list_partitions}
 
     def __contains__(self, key):
         """
         Return True if the dict has a key, else return False.
         key in d
         """
-        return key in self.consumers
+        return key in self.partitions
 
     def __getitem__(self, key):
         """
@@ -23,17 +23,17 @@ class DictHealer:
         Raises a KeyError if key is not in the map.
         d[key]
         """
-        if key not in self.consumers:
-            self.list_consumers = self.list_consumers + [key]
-            self.dict[self.consumer] = ','.join(self.list_consumers)
-            self.consumers[key] = Dict(redis=self.redis, key=f'{self.consumer}-{key}')
-        return self.consumers[key]
+        if key not in self.partitions:
+            self.list_partitions = self.list_partitions + [key]
+            self.dict[self.consumer] = ','.join(self.list_partitions)
+            self.partitions[key] = Dict(redis=self.redis, key=f'{self.consumer}-{key}')
+        return self.partitions[key]
 
     def pop(self, key, default=None):
         if self.__contains__(key):
-            value = self.consumers.pop(key)
-            self.list_consumers = list(self.consumers.keys())
-            self.dict[self.consumer] = ','.join(self.list_consumers)
+            value = self.partitions.pop(key)
+            self.list_partitions = list(self.partitions.keys())
+            self.dict[self.consumer] = ','.join(self.list_partitions)
             self.redis.delete(f'{self.consumer}-{key}')
             return value
         else:
@@ -46,4 +46,4 @@ class DictHealer:
             return default
 
     def keys(self):
-        return [c for c in self.list_consumers if len(c)]
+        return [p for p in self.list_partitions if len(p)]

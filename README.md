@@ -6,7 +6,7 @@
 
 ---
 
-**water-healer**, Forked of Streamz to update Kafka consumer offset for every successful sink.
+**water-healer**, Forked of Streamz to deliver processing guarantees at least once for Kafka consumers.
 
 This library also added streaming metrics, auto-shutdown, auto-graceful, unique emit ID, checkpointing, remote logging and additional functions to stream pipeline. Only compatible with `streamz==0.5.2`.
 
@@ -22,6 +22,7 @@ This library also added streaming metrics, auto-shutdown, auto-graceful, unique 
   * [Installing from the PyPI](#Installing-from-the-PyPI)
   * [How-to](#how-to)
     * [update offset](#update-offset)
+    * [Provide at-most-once](#provide-at-most-once)
     * [streaming metrics](#streaming-metrics)
     * [auto shutdown](#auto-shutdown)
     * [auto graceful delete](#auto-graceful-delete)
@@ -134,7 +135,7 @@ On fourth polling, we should pull back `offset` 2, not proceed
 
 ### update offset for distributed processing
 
-In a real world, some of realtime functions might take some time, maybe caused some long polling like merging data from database or waiting some events.
+In a real world, some of real time functions might take some time, maybe caused some long polling like merging data from database or waiting some events.
 
 Let say we have a single stream and 3 workers can execute a function in parallel manner, the function simply like,
 
@@ -170,6 +171,8 @@ So, water-healer will wait offset `1` first, after that will execute offset `2` 
 
 Or maybe this google slide can help you to understand more about water healer, [link to slide](https://docs.google.com/presentation/d/1ixiFIfcnVajMK8L6lY2hG_X5vipQ3gRk_ZsFjuXCWEY/edit?usp=sharing).
 
+Or this Medium article about [Processing guarantees in Kafka](https://medium.com/@andy.bryant/processing-guarantees-in-kafka-12dd2e30be0e).
+
 ## Installing from the PyPI
 
 ```bash
@@ -200,6 +203,36 @@ source.healing()
 We need to use `waterhealer.from_kafka` for streaming source, and use `waterhealer.healing` for sinking or mapping process.
 
 Simply can read more about [waterhealer.from_kafka](#waterhealerkafkafrom_kafka) and [waterhealer.healing](#waterhealerhealinghealing)
+
+### Provide at-most-once
+
+To ensure at-most-once processed for Kafka consumers, we have to introduce distributed messaging among consumers about failed and successed events so new consumers that joined in the same consumer group will not pulled the same successful events but not yet committed in Kafka offsets.
+
+We use Redis for distributed messaging instead of Zookeeper, faster and easier interface. To provide at-most-once,
+
+```python
+import waterhealer as wh
+from redis import StrictRedis
+
+redis = StrictRedis()
+source = wh.from_kafka(
+    ['testing'],
+    {
+        'bootstrap.servers': 'localhost:9092',
+        'group.id': 'group',
+        'auto.offset.reset': 'latest',
+    },
+    redis=redis)
+
+source.healing()
+```
+
+Simply pass `redis` parameter for `wh.from_kafka`, default is `None`, will use `defaultdict`.
+
+For example,
+
+- `waterhealer.kafka.from_kafka`, [simple-plus-element-kafka-redis.ipynb](example/simple-plus-element-kafka-redis.ipynb).
+- `waterhealer.kafka.from_kafka_batched_scatter`, [simple-plus-element-kafka-scatter-redis.ipynb](example/simple-plus-element-kafka-scatter-redis.ipynb).
 
 ### streaming metrics
 
@@ -658,14 +691,14 @@ def remote_logging(client, persistent_class,
 #### waterhealer.kafka.from_kafka
 
 ```python
-class from_kafka(Source):
+class from_kafka(Source, KafkaOffset):
     """
 
     Parameters
     ----------
-    topics: list of str
-        Labels of Kafka topics to consume from
-    consumer_params: dict
+    topics: List[str]
+        Labels of Kafka topics to consume from.
+    consumer_params: Dict
         Settings to set up the stream, see
         https://docs.confluent.io/current/clients/confluent-kafka-python/#configuration
         https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
@@ -674,20 +707,25 @@ class from_kafka(Source):
         Kafka;
         group.id, Identity of the consumer. If multiple sources share the same
         group, each message will be passed to only one of them.
-    poll_interval: number
-        Seconds that elapse between polling Kafka for new messages
-    start: bool, (default=False)
+    poll_interval: float, optional (default=0.1)
+        Seconds that elapse between polling Kafka for new messages.
+    start: bool, optional (default=False)
         Whether to start polling upon instantiation
-    debug: bool, (default=False)
-        If True, will print topic, partition and offset for each polled message.
-    maxlen_memory: int, (default=10000)
+    redis: redis.StrictRedis, optional (default=None)
+        if provided, memory will initiate using Redis.
+        Else, will use `ExpiringDict`.
+    maxlen_memory: int, optional (default=10_000_000)
         max length of topic and partition dictionary for healing process.
-    maxage_memory: int, (default=3600)
+        Only useful if Redis is None.
+    maxage_memory: int, optional (default=3600)
         max age for a partition stay in topic and partition dictionary.
+        Only useful if Redis is None.
+    redis_key: str, optional (default='water-healer-from_kafka')
+        Unique identifier for Redis key.
     """
 ```
 
-`waterhealer.from_kafka` always returned a tuple,
+`waterhealer.kafka.from_kafka` always returned a tuple,
 
 ```python
 (uuid, value)
@@ -707,19 +745,19 @@ If you want to use waterhealer, you need to make sure `uuid` from `from_kafka` s
 
 Example, [simple-plus-element-kafka.ipynb](example/simple-plus-element-kafka.ipynb).
 
-**Output from `waterhealer.from_kafka` is different from any sources object from `streamz`, `streamz` only returned `value`, not tuple as `waterhealer.from_kafka`.**
+**Output from `waterhealer.kafka.from_kafka` is different from any sources object from `streamz`, `streamz` only returned `value`, not tuple as `waterhealer.kafka.from_kafka`.**
 
 #### waterhealer.kafka.from_kafka_batched
 
 ```python
-class from_kafka_batched(Source):
+class from_kafka_batched(Source, KafkaOffset):
     """
 
     Parameters
     ----------
-    topics: list of str
-        Labels of Kafka topics to consume from
-    consumer_params: dict
+    topics: List[str]
+        Labels of Kafka topics to consume from.
+    consumer_params: Dict
         Settings to set up the stream, see
         https://docs.confluent.io/current/clients/confluent-kafka-python/#configuration
         https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
@@ -728,45 +766,54 @@ class from_kafka_batched(Source):
         Kafka;
         group.id, Identity of the consumer. If multiple sources share the same
         group, each message will be passed to only one of them.
-    batch_size: int
-        batch size of polling
-    batch_timeout: number
-        timeout for batching if not reach size `batch_size`
-    poll_interval: number
-        Seconds that elapse between polling Kafka for new messages
-    start: bool, (default=False)
-        Whether to start polling upon instantiation
-    debug: bool, (default=False)
-        If True, will print topic, partition and offset for each polled message.
-    maxlen_memory: int, (default=10_000_000)
+    batch_size: int, optional (default=100)
+        batch size of polling.
+    batch_timeout: float, optional (default=10)
+        timeout for batching if not reach size `batch_size`.
+    poll_interval: float, optional (default=0.1)
+        Seconds that elapse between polling Kafka for new messages.
+    start: bool, optional (default=False)
+        Whether to start polling upon instantiation.
+    redis: redis.StrictRedis, optional (default=None)
+        if provided, memory will initiate using Redis.
+        Else, will use `ExpiringDict`.
+    maxlen_memory: int, optional (default=10_000_000)
         max length of topic and partition dictionary for healing process.
-    maxage_memory: int, (default=3600)
+        Only useful if Redis is None.
+    maxage_memory: int, optional (default=3600)
         max age for a partition stay in topic and partition dictionary.
+        Only useful if Redis is None.
+    redis_key: str, optional (default='water-healer-from_kafka_batched')
+        Unique identifier for Redis key.
     """
 ```
 
-Same as `waterhealer.from_kafka`, but we pulled partitions in parallel manners.
+Same as `waterhealer.kafka.from_kafka`, but we poll events and emit it as a batch of events.
+
+**Output from `waterhealer.kafka.from_kafka_batched` is different from any sources object from `streamz`, `streamz` only returned `value`, not tuple as `waterhealer.kafka.from_kafka_batched`.**
 
 #### waterhealer.kafka.from_kafka_batched_scatter
 
 ```python
 def from_kafka_batched_scatter(
-    topics,
-    consumer_params,
-    poll_interval = 5,
-    batch_size = 1000,
-    maxlen_memory = 10_000_000,
-    maxage_memory = 3600,
-    dask = False,
+    topics: List[str],
+    consumer_params: Dict,
+    poll_interval: int = 5,
+    batch_size: int = 1000,
+    dask: bool = False,
+    redis: StrictRedis = None,
+    maxlen_memory: int = 10_000_000,
+    maxage_memory: int = 3600,
+    redis_key: str = 'water-healer-from_kafka_batched_scatter',
     **kwargs,
 ):
     """
 
     Parameters
     ----------
-    topics: list of str
-        Labels of Kafka topics to consume from
-    consumer_params: dict
+    topics: List[str]
+        Labels of Kafka topics to consume from.
+    consumer_params: Dict
         Settings to set up the stream, see
         https://docs.confluent.io/current/clients/confluent-kafka-python/#configuration
         https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
@@ -775,18 +822,27 @@ def from_kafka_batched_scatter(
         Kafka;
         group.id, Identity of the consumer. If multiple sources share the same
         group, each message will be passed to only one of them.
-    batch_size: int
-        batch size of polling
-    poll_interval: number
-        Seconds that elapse between polling Kafka for new messages
-    maxlen_memory: int, (default=10_000_000)
+    batch_size: int, optional (default=1000)
+        batch size of polling.
+    poll_interval: float, optional (default=5.0)
+        Seconds that elapse between polling Kafka for new messages.
+    dask: bool, optional (default=False)
+        If True, will poll events from each partitions distributed among Dask workers.
+    redis: redis.StrictRedis, optional (default=None)
+        if provided, memory will initiate using Redis.
+        Else, will use `ExpiringDict`.
+    maxlen_memory: int, optional (default=10_000_000)
         max length of topic and partition dictionary for healing process.
-    maxage_memory: int, (default=3600)
+        Only useful if Redis is None.
+    maxage_memory: int, optional (default=3600)
         max age for a partition stay in topic and partition dictionary.
-    dask_bootstrap: str, (default=None)
-        dask bootstrap, will automatically scatter the offsets if provided the bootstrap.
+        Only useful if Redis is None.
+    redis_key: str, optional (default='water-healer-from_kafka_batched_scatter')
+        Unique identifier for Redis key.
     """
 ```
+
+Same as `waterhealer.kafka.from_kafka`, but we distribute available partitions among Dask workers and will poll it and emit as a batch of events. The distributed only useful if `dask` is `True`.
 
 Example, [simple-plus-element-kafka-scatter.ipynb](example/simple-plus-element-kafka-scatter.ipynb).
 
