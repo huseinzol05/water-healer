@@ -94,6 +94,42 @@ if ENABLE_JSON_LOGGING:
     except BaseException:
         logger.warning('json-logging not installed. Please install it by `pip install json-logging` and try again.')
 
+ENABLE_OPENTELEMETRY_JAEGER = to_bool(os.environ.get('ENABLE_OPENTELEMETRY_JAEGER', 'false'))
+OPENTELEMETRY_SERVICE_NAME = os.environ.get('OPENTELEMETRY_SERVICE_NAME', 'water-healer')
+JAEGER_HOSTNAME = os.environ.get('JAEGER_HOSTNAME', 'localhost')
+JAEGER_PORT = os.environ.get('JAEGER_PORT', '6831')
+
+tracer = None
+if ENABLE_OPENTELEMETRY_JAEGER:
+    try:
+        from opentelemetry import trace
+        from opentelemetry.exporter.jaeger.thrift import JaegerExporter
+        from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
+    except BaseException:
+        logger.warning(
+            'opentelemetry-exporter-jaeger not installed. Please install it by `pip install opentelemetry-exporter-jaeger` and try again.')
+
+    try:
+        trace.set_tracer_provider(
+            TracerProvider(
+                resource=Resource.create({SERVICE_NAME: OPENTELEMETRY_SERVICE_NAME})
+            )
+        )
+        jaeger_exporter = JaegerExporter(
+            agent_host_name=JAEGER_HOSTNAME,
+            agent_port=int(JAEGER_PORT),
+        )
+
+        trace.get_tracer_provider().add_span_processor(
+            BatchSpanProcessor(jaeger_exporter)
+        )
+        tracer = trace.get_tracer(__name__)
+
+    except Exception as e:
+        logger.exception(f'error to initiate tracer, {str(e)}')
+
 
 def get_io_loop(asynchronous=None):
     if asynchronous:
@@ -326,7 +362,7 @@ class Stream(object):
 
     @classmethod
     def register_api(cls, modifier=identity):
-        """ 
+        """
         Add callable to Stream API
 
         This allows you to register a new method onto this class.  You can use
@@ -516,7 +552,15 @@ class Stream(object):
         result = []
         for downstream in list(self.downstreams):
             try:
-                r = downstream.update(x, emit_id=emit_id, who=self)
+                if tracer:
+                    name = type(self).__name__
+                    if hasattr(self, 'func'):
+                        name = f'{name}.{self.func.__name__}'
+                    with tracer.start_as_current_span(emit_id):
+                        with tracer.start_as_current_span(name):
+                            r = downstream.update(x, emit_id=emit_id, who=self)
+                else:
+                    r = downstream.update(x, emit_id=emit_id, who=self)
                 if isinstance(r, list):
                     result.extend(r)
                 else:
