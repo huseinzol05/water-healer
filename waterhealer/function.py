@@ -56,19 +56,19 @@ def to_bool(value):
         return False
 
 
-def get_memory(source, consumer=None, memory=None):
+def get_db(source, consumer=None, db=None):
 
-    if hasattr(source, 'memory'):
-        return source, source.consumer, source.memory
+    if hasattr(source, 'db'):
+        return source, source.consumer, source.db
 
     if isinstance(source, tuple):
         source = source[0]
 
     for upstream in source.upstreams:
-        if hasattr(upstream, 'memory'):
-            return upstream, upstream.consumer, upstream.memory
-        return get_memory(upstream, consumer, memory)
-    return source, consumer, memory
+        if hasattr(upstream, 'db'):
+            return upstream, upstream.consumer, upstream.db
+        return get_db(upstream, consumer, db)
+    return source, consumer, db
 
 
 def get_error(source, error=None, last_poll=None):

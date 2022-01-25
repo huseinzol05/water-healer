@@ -4,7 +4,7 @@ from .core import Stream, convert_interval, logger
 from .function import (
     topic_partition_str,
     str_topic_partition,
-    get_memory,
+    get_db,
     get_error,
     get_source,
 )
@@ -40,7 +40,7 @@ class healing(Stream):
         self.partitions = []
         self.last = gen.moment
         self.last_emit_id = None
-        _, self.consumer, self.memory = get_memory(upstream)
+        _, self.consumer, self.db = get_db(upstream)
 
         Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
 
@@ -56,7 +56,7 @@ class healing(Stream):
                 offset = row[0].get('offset')
                 topic = row[0].get('topic')
                 topic_partition = topic_partition_str(topic, partition)
-                m = self.memory.get(topic_partition)
+                m = self.db.get(topic_partition)
 
                 if partition < 0 or offset is None or topic is None:
                     logger.warning(f'{row[1]}, invalid water-healer data schema')
@@ -94,7 +94,7 @@ class healing(Stream):
 
     def get_source_consumer(self):
         if self.consumer is None:
-            _, self.consumer, self.memory = get_memory(self.upstreams[0])
+            _, self.consumer, self.db = get_db(self.upstreams[0])
         return self.consumer is not None
 
     @gen.coroutine
@@ -102,10 +102,10 @@ class healing(Stream):
         while True:
             started = self.get_source_consumer()
             if started:
-                delete_from_memory = []
-                for topic_partition in self.memory.keys():
+                delete_from_db = []
+                for topic_partition in self.db.keys():
                     topic, partition = str_topic_partition(topic_partition)
-                    if len(self.memory[topic_partition]):
+                    if len(self.db[topic_partition]):
                         while True:
                             try:
                                 low_offset, high_offset = self.consumer.get_watermark_offsets(
@@ -118,12 +118,12 @@ class healing(Stream):
                             except Exception as e:
                                 logger.warning(e)
 
-                        for offset in sorted(self.memory[topic_partition].keys()):
-                            if self.memory[topic_partition][offset]:
+                        for offset in sorted(self.db[topic_partition].keys()):
+                            if self.db[topic_partition][offset]:
                                 if offset < current_offset:
                                     logger.warning(
                                         f'topic partition: {topic_partition}, offset: {offset}, current offset: {current_offset}, current offset higher than message offset')
-                                    delete_from_memory.append(
+                                    delete_from_db.append(
                                         ck.TopicPartition(topic, partition, offset + 1)
                                     )
                                 else:
@@ -136,14 +136,14 @@ class healing(Stream):
                 if self.commit():
                     L = []
                     for p in self.partitions:
-                        self.memory[topic_partition_str(p.topic, p.partition)].pop(p.offset - 1)
+                        self.db[topic_partition_str(p.topic, p.partition)].pop(p.offset - 1)
                         L.append({'topic': p.topic, 'partition': p.partition, 'offset': p.offset - 1})
                     self.last = self._emit(L, emit_id=self.last_emit_id)
                     self.partitions = []
                     self.last_emit_id = None
 
-                for p in delete_from_memory:
-                    self.memory[topic_partition_str(p.topic, p.partition)].pop(p.offset - 1)
+                for p in delete_from_db:
+                    self.db[topic_partition_str(p.topic, p.partition)].pop(p.offset - 1)
 
             yield self.last
             yield gen.sleep(self.interval)

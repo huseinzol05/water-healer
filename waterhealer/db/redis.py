@@ -2,8 +2,20 @@ from redis_collections import Dict
 from redis import StrictRedis
 
 
-class DictHealer:
-    def __init__(self, redis: StrictRedis, consumer: str, key: str = 'water-healer'):
+class Database:
+    def __init__(self, redis: StrictRedis,
+                 consumer: str,
+                 key: str = 'water-healer', **kwargs):
+        """
+        Parameters
+        ----------
+        redis: redis.StrictRedis
+            redis.StrictRedis object.
+        consumer: str
+            consumer name. Make sure `consumer` same as `consumer` use in kafka consumer.
+        key: str, optional (default='water-healer')
+            Redis key, to distinguish redis database.
+        """
         self.redis = redis
         self.consumer = consumer
         self.dict = Dict(redis=redis, key=key)

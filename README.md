@@ -202,19 +202,24 @@ source.healing()
 
 We need to use `waterhealer.from_kafka` for streaming source, and use `waterhealer.healing` for sinking or mapping process.
 
-Simply can read more about [waterhealer.from_kafka](#waterhealerkafkafrom_kafka) and [waterhealer.healing](#waterhealerhealinghealing)
+Simply can read more about [waterhealer.kafka.from_kafka](#waterhealerkafkafrom_kafka) and [waterhealer.healing.healing](#waterhealerhealinghealing)
 
 ### Provide at-most-once
 
 To ensure at-most-once processed for Kafka consumers, we have to introduce distributed messaging among consumers about failed and successed events so new consumers that joined in the same consumer group will not pulled the same successful events but not yet committed in Kafka offsets.
 
-We use Redis for distributed messaging instead of Zookeeper, faster and easier interface. To provide at-most-once,
+We can use any persistent database to validate the offsets, faster and easier interface. To provide at-most-once,
 
 ```python
 import waterhealer as wh
 from redis import StrictRedis
+from waterhealer.db.redis import Database
 
+consumer = 'consumer'
 redis = StrictRedis()
+db = Database(redis = redis, consumer = consumer, key = 'water-healer-scatter')
+
+
 source = wh.from_kafka(
     ['testing'],
     {
@@ -222,12 +227,12 @@ source = wh.from_kafka(
         'group.id': 'group',
         'auto.offset.reset': 'latest',
     },
-    redis=redis)
+    db=db)
 
 source.healing()
 ```
 
-Simply pass `redis` parameter for `wh.from_kafka`, default is `None`, will use `defaultdict`.
+Simply pass `db` parameter for `wh.from_kafka`, default is `None`, will use `waterhealer.db.expiringdict.Database`.
 
 For example,
 

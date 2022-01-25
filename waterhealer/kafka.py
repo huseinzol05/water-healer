@@ -1,12 +1,8 @@
 from .core import Stream, convert_interval, logger
 from .function import topic_partition_str
-from .utils.redis import DictHealer
+from .db.expiringdict import Database
 from tornado import gen
-from itertools import cycle
-from collections import defaultdict
-from expiringdict import ExpiringDict
 from datetime import datetime
-from redis import StrictRedis
 from typing import List, Dict
 import confluent_kafka as ck
 import time
@@ -34,30 +30,21 @@ def _close_consumer(consumer):
 class KafkaOffset:
     def __init__(
         self,
-        redis: StrictRedis = None,
-        maxlen_memory: int = 10_000_000,
-        maxage_memory: int = 3600,
-        redis_key: str = 'water-healer-from_kafka',
+        db=None,
+        **kwargs,
     ):
-        self.redis = redis
-        self.redis_kwargs = None
-        if redis is not None:
-            self.memory = DictHealer(redis=redis, consumer=self.cpars['group.id'], key=redis_key)
-            self.redis_kwargs = self.redis.connection_pool.connection_kwargs
-            logger.info(f"Use Redis memory with consumer={self.cpars['group.id']}, key={redis_key}")
+        self.db = db
+        if self.db is None:
+            self.db = DictHealer(**kwargs)
+            logger.info(
+                f'Use waterhealer.db.expiringdict.DictHealer with max_len={db.maxlen_memory}, max_age_seconds={db.maxage_memory}')
         else:
-            self.memory = defaultdict(
-                lambda: ExpiringDict(
-                    max_len=maxlen_memory, max_age_seconds=maxage_memory
-                )
-            )
-            logger.info(f'Use local ExpiringDict memory with max_len={maxlen_memory}, max_age_seconds={maxage_memory}')
+            logger.info(f'Use {db.__module__}.{db.__class__.__name__}')
 
 
 @Stream.register_api(staticmethod)
 class from_kafka(Source, KafkaOffset):
     """
-
     Parameters
     ----------
     topics: List[str]
@@ -75,17 +62,6 @@ class from_kafka(Source, KafkaOffset):
         Seconds that elapse between polling Kafka for new messages.
     start: bool, optional (default=False)
         Whether to start polling upon instantiation
-    redis: redis.StrictRedis, optional (default=None)
-        if provided, memory will initiate using Redis.
-        Else, will use `ExpiringDict`.
-    maxlen_memory: int, optional (default=10_000_000)
-        max length of topic and partition dictionary for healing process.
-        Only useful if Redis is None.
-    maxage_memory: int, optional (default=3600)
-        max age for a partition stay in topic and partition dictionary.
-        Only useful if Redis is None.
-    redis_key: str, optional (default='water-healer-from_kafka')
-        Unique identifier for Redis key.
     """
 
     def __init__(
@@ -94,20 +70,11 @@ class from_kafka(Source, KafkaOffset):
         consumer_params: Dict,
         poll_interval: float = 0.1,
         start: bool = False,
-        redis: StrictRedis = None,
-        maxlen_memory: int = 10_000_000,
-        maxage_memory: int = 3600,
-        redis_key: str = 'water-healer-from_kafka',
+        db=None,
         **kwargs,
     ):
         self.cpars = consumer_params
-        KafkaOffset.__init__(
-            self,
-            redis=redis,
-            maxlen_memory=maxlen_memory,
-            maxage_memory=maxage_memory,
-            redis_key=redis_key,
-        )
+        KafkaOffset.__init__(self, db=db, **kwargs)
         self.cpars['enable.auto.commit'] = False
         self.consumer = None
         self.topics = topics
@@ -145,14 +112,10 @@ class from_kafka(Source, KafkaOffset):
                 )
 
                 topic_partition = topic_partition_str(topic, partition)
-
-                if self.redis is not None and self.memory[topic_partition].get(offset):
+                if self.db[topic_partition].get(offset, False):
                     continue
 
-                self.memory[topic_partition][
-                    offset
-                ] = False
-
+                self.db[topic_partition][offset] = False
                 self.last_poll = datetime.now()
                 yield self._emit((id_val, val))
             else:
@@ -207,17 +170,6 @@ class from_kafka_batched(Source, KafkaOffset):
         Seconds that elapse between polling Kafka for new messages.
     start: bool, optional (default=False)
         Whether to start polling upon instantiation.
-    redis: redis.StrictRedis, optional (default=None)
-        if provided, memory will initiate using Redis.
-        Else, will use `ExpiringDict`.
-    maxlen_memory: int, optional (default=10_000_000)
-        max length of topic and partition dictionary for healing process.
-        Only useful if Redis is None.
-    maxage_memory: int, optional (default=3600)
-        max age for a partition stay in topic and partition dictionary.
-        Only useful if Redis is None.
-    redis_key: str, optional (default='water-healer-from_kafka_batched')
-        Unique identifier for Redis key.
     """
 
     def __init__(
@@ -228,20 +180,11 @@ class from_kafka_batched(Source, KafkaOffset):
         batch_timeout: float = 10,
         poll_interval: float = 0.1,
         start: bool = False,
-        redis: StrictRedis = None,
-        maxlen_memory: int = 10_000_000,
-        maxage_memory: int = 3600,
-        redis_key: str = 'water-healer-from_kafka_batched',
+        db=None,
         **kwargs,
     ):
         self.cpars = consumer_params
-        KafkaOffset.__init__(
-            self,
-            redis=redis,
-            maxlen_memory=maxlen_memory,
-            maxage_memory=maxage_memory,
-            redis_key=redis_key,
-        )
+        KafkaOffset.__init__(self, db=db, **kwargs)
         self.cpars['enable.auto.commit'] = False
         self.consumer = None
         self.topics = topics
@@ -292,12 +235,11 @@ class from_kafka_batched(Source, KafkaOffset):
                     f'topic: {topic}, partition: {partition}, offset: {offset}, data: {val}'
                 )
 
-                if self.redis is not None and self.memory[topic_partition].get(offset):
+                topic_partition = topic_partition_str(topic, partition)
+                if self.db[topic_partition].get(offset, False):
                     continue
 
-                self.memory[topic_partition_str(topic, partition)][
-                    offset
-                ] = False
+                self.db[topic_partition][offset] = False
                 self.buffer.append((id_val, val))
             else:
                 yield gen.sleep(self.poll_interval)
@@ -337,20 +279,11 @@ class FromKafkaBatched(Source, KafkaOffset):
         consumer_params: Dict,
         poll_interval: int = 10,
         batch_size: int = 1000,
-        redis: StrictRedis = None,
-        maxlen_memory: int = 10_000_000,
-        maxage_memory: int = 3600,
-        redis_key: str = 'water-healer-from_kafka_batched_scatter',
+        db=None,
         **kwargs,
     ):
         self.cpars = consumer_params
-        KafkaOffset.__init__(
-            self,
-            redis=redis,
-            maxlen_memory=maxlen_memory,
-            maxage_memory=maxage_memory,
-            redis_key=redis_key,
-        )
+        KafkaOffset.__init__(self, db=db, **kwargs)
         self.cpars['enable.auto.commit'] = False
         self.consumer = None
         self.topics = topics
@@ -426,7 +359,7 @@ class FromKafkaBatched(Source, KafkaOffset):
                                 partition,
                                 lowest,
                                 high - 1,
-                                self.redis_kwargs,
+                                set(),
                             )
                         )
                         self.positions[no][partition] = high
@@ -434,11 +367,11 @@ class FromKafkaBatched(Source, KafkaOffset):
             for part in out:
                 for offset in range(part[-3], part[-2] + 1):
                     topic_partition = topic_partition_str(part[1], part[2])
-                    if self.redis is not None and self.memory[topic_partition].get(offset):
+                    if self.db[topic_partition].get(offset, False):
+                        part[-1].add(offset)
                         continue
-                    self.memory[topic_partition][
-                        offset
-                    ] = False
+
+                    self.db[topic_partition][offset] = False
                 self.last_poll = datetime.now()
                 yield self._emit(part)
 
@@ -466,33 +399,28 @@ class FromKafkaBatched(Source, KafkaOffset):
 
 
 def get_message_batch(
-    kafka_params, topic, partition, low, high, redis_kwargs=None, timeout=None
+    kafka_params, topic, partition, low, high, done=set(), timeout=None
 ):
     import confluent_kafka as ck
-    from redis import StrictRedis
-    from redis_collections import Dict
 
     t0 = time.time()
     consumer = ck.Consumer(kafka_params)
     tp = ck.TopicPartition(topic, partition, low)
     consumer.assign([tp])
     out = []
-    if redis_kwargs is not None:
-        topic_partition = topic_partition_str(topic, partition)
-        consumer_name = kafka_params['group.id']
-        redis = Dict(redis=StrictRedis(**redis_kwargs), key=f'{consumer_name}-{topic_partition}')
-    else:
-        redis = None
     try:
         while True:
             msg = consumer.poll(0)
             if msg and msg.value() and msg.error() is None:
                 partition = msg.partition()
+
+                if partition in done:
+                    continue
+
                 offset = msg.offset()
                 topic = msg.topic()
                 val = msg.value()
-                if redis is not None and redis.get(offset):
-                    continue
+
                 id_val = {
                     'partition': partition,
                     'offset': offset,
@@ -518,14 +446,10 @@ def from_kafka_batched_scatter(
     poll_interval: int = 5,
     batch_size: int = 1000,
     dask: bool = False,
-    redis: StrictRedis = None,
-    maxlen_memory: int = 10_000_000,
-    maxage_memory: int = 3600,
-    redis_key: str = 'water-healer-from_kafka_batched_scatter',
+    db=None,
     **kwargs,
 ):
     """
-
     Parameters
     ----------
     topics: List[str]
@@ -545,17 +469,6 @@ def from_kafka_batched_scatter(
         Seconds that elapse between polling Kafka for new messages.
     dask: bool, optional (default=False)
         If True, will poll events from each partitions distributed among Dask workers.
-    redis: redis.StrictRedis, optional (default=None)
-        if provided, memory will initiate using Redis.
-        Else, will use `ExpiringDict`.
-    maxlen_memory: int, optional (default=10_000_000)
-        max length of topic and partition dictionary for healing process.
-        Only useful if Redis is None.
-    maxage_memory: int, optional (default=3600)
-        max age for a partition stay in topic and partition dictionary.
-        Only useful if Redis is None.
-    redis_key: str, optional (default='water-healer-from_kafka_batched_scatter')
-        Unique identifier for Redis key.
     """
     if dask:
         from distributed.client import default_client
@@ -566,10 +479,7 @@ def from_kafka_batched_scatter(
         consumer_params=consumer_params,
         poll_interval=poll_interval,
         batch_size=batch_size,
-        redis=redis,
-        maxlen_memory=maxlen_memory,
-        maxage_memory=maxage_memory,
-        redis_key=redis_key,
+        db=db,
         **kwargs,
     )
 
