@@ -715,18 +715,10 @@ class from_kafka(Source, KafkaOffset):
     poll_interval: float, optional (default=0.1)
         Seconds that elapse between polling Kafka for new messages.
     start: bool, optional (default=False)
-        Whether to start polling upon instantiation
-    redis: redis.StrictRedis, optional (default=None)
-        if provided, memory will initiate using Redis.
-        Else, will use `ExpiringDict`.
-    maxlen_memory: int, optional (default=10_000_000)
-        max length of topic and partition dictionary for healing process.
-        Only useful if Redis is None.
-    maxage_memory: int, optional (default=3600)
-        max age for a partition stay in topic and partition dictionary.
-        Only useful if Redis is None.
-    redis_key: str, optional (default='water-healer-from_kafka')
-        Unique identifier for Redis key.
+        Whether to start polling upon instantiation.
+    db: Callable, optional (default=None)
+        persistent layer to check kafka offset to provide once-semantics.
+        If None, will initiate waterhealer.db.expiringdict.Database.
     """
 ```
 
@@ -779,17 +771,9 @@ class from_kafka_batched(Source, KafkaOffset):
         Seconds that elapse between polling Kafka for new messages.
     start: bool, optional (default=False)
         Whether to start polling upon instantiation.
-    redis: redis.StrictRedis, optional (default=None)
-        if provided, memory will initiate using Redis.
-        Else, will use `ExpiringDict`.
-    maxlen_memory: int, optional (default=10_000_000)
-        max length of topic and partition dictionary for healing process.
-        Only useful if Redis is None.
-    maxage_memory: int, optional (default=3600)
-        max age for a partition stay in topic and partition dictionary.
-        Only useful if Redis is None.
-    redis_key: str, optional (default='water-healer-from_kafka_batched')
-        Unique identifier for Redis key.
+    db: Callable, optional (default=None)
+        persistent layer to check kafka offset to provide once-semantics.
+        If None, will initiate waterhealer.db.expiringdict.Database.
     """
 ```
 
@@ -806,10 +790,7 @@ def from_kafka_batched_scatter(
     poll_interval: int = 5,
     batch_size: int = 1000,
     dask: bool = False,
-    redis: StrictRedis = None,
-    maxlen_memory: int = 10_000_000,
-    maxage_memory: int = 3600,
-    redis_key: str = 'water-healer-from_kafka_batched_scatter',
+    db = None,
     **kwargs,
 ):
     """
@@ -833,17 +814,9 @@ def from_kafka_batched_scatter(
         Seconds that elapse between polling Kafka for new messages.
     dask: bool, optional (default=False)
         If True, will poll events from each partitions distributed among Dask workers.
-    redis: redis.StrictRedis, optional (default=None)
-        if provided, memory will initiate using Redis.
-        Else, will use `ExpiringDict`.
-    maxlen_memory: int, optional (default=10_000_000)
-        max length of topic and partition dictionary for healing process.
-        Only useful if Redis is None.
-    maxage_memory: int, optional (default=3600)
-        max age for a partition stay in topic and partition dictionary.
-        Only useful if Redis is None.
-    redis_key: str, optional (default='water-healer-from_kafka_batched_scatter')
-        Unique identifier for Redis key.
+    db: Callable, optional (default=None)
+        persistent layer to check kafka offset to provide once-semantics.
+        If None, will initiate waterhealer.db.expiringdict.Database.
     """
 ```
 

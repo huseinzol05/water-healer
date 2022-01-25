@@ -61,7 +61,10 @@ class from_kafka(Source, KafkaOffset):
     poll_interval: float, optional (default=0.1)
         Seconds that elapse between polling Kafka for new messages.
     start: bool, optional (default=False)
-        Whether to start polling upon instantiation
+        Whether to start polling upon instantiation.
+    db: Callable, optional (default=None)
+        persistent layer to check kafka offset to provide once-semantics.
+        If None, will initiate waterhealer.db.expiringdict.Database.
     """
 
     def __init__(
@@ -170,6 +173,9 @@ class from_kafka_batched(Source, KafkaOffset):
         Seconds that elapse between polling Kafka for new messages.
     start: bool, optional (default=False)
         Whether to start polling upon instantiation.
+    db: Callable, optional (default=None)
+        persistent layer to check kafka offset to provide once-semantics.
+        If None, will initiate waterhealer.db.expiringdict.Database.
     """
 
     def __init__(
@@ -469,6 +475,9 @@ def from_kafka_batched_scatter(
         Seconds that elapse between polling Kafka for new messages.
     dask: bool, optional (default=False)
         If True, will poll events from each partitions distributed among Dask workers.
+    db: Callable, optional (default=None)
+        persistent layer to check kafka offset to provide once-semantics.
+        If None, will initiate waterhealer.db.expiringdict.Database.
     """
     if dask:
         from distributed.client import default_client
