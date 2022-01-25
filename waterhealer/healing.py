@@ -83,7 +83,7 @@ class healing(Stream):
                 success = True
                 LAST_UPDATED = now
             except Exception as e:
-                if ignore:
+                if self.ignore:
                     logger.warning(str(e))
                     reason = str(e)
                 else:
