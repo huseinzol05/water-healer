@@ -21,7 +21,7 @@ setuptools.setup(
         'confluent_kafka',
         'networkx==2.3',
         'graphviz',
-        'json-logging'
+        'json-logging',
         'redis',
         'redis-collections',
     ],
