@@ -7,12 +7,14 @@ from .function import (
     get_db,
     get_error,
     get_source,
+    to_bool,
 )
 import confluent_kafka as ck
 import os
 import time
 
 LAST_UPDATED = datetime.now()
+COMMIT_COUNT = 0
 
 
 @Stream.register_api()
@@ -71,7 +73,7 @@ class healing(Stream):
         return self.last
 
     def commit(self):
-        global LAST_UPDATED
+        global LAST_UPDATED, COMMIT_COUNT
         success = False
         now = datetime.now()
         if len(self.partitions) and self.consumer is not None:
@@ -82,6 +84,7 @@ class healing(Stream):
                 )
                 success = True
                 LAST_UPDATED = now
+                COMMIT_COUNT += 1
             except Exception as e:
                 if self.ignore:
                     logger.warning(str(e))
@@ -151,13 +154,14 @@ class healing(Stream):
 
 def auto_shutdown(
     source,
-    got_error: bool = True,
-    got_dask: bool = True,
-    graceful_offset: int = 3600,
-    graceful_polling: int = 1800,
-    interval: int = 5,
-    sleep_before_shutdown: int = 2,
-    auto_expired: int = 10800,
+    got_error: bool = to_bool(os.environ.get('HEALING_GOT_ERROR', 'true')),
+    got_dask: bool = to_bool(os.environ.get('HEALING_GOT_DASK', 'true')),
+    graceful_offset: int = int(os.environ.get('HEALING_GRACEFUL_OFFSET', 3600)),
+    graceful_polling: int = int(os.environ.get('HEALING_GRACEFUL_POLLING', 1800)),
+    interval: int = int(os.environ.get('HEALING_INTERVAL', 5)),
+    sleep_before_shutdown: int = int(os.environ.get('HEALING_SLEEP_BEFORE_SHUTDOWN', 2)),
+    auto_expired: int = int(os.environ.get('HEALING_AUTO_EXPIRED', 10800)),
+    max_total_commit: int = int(os.environ.get('HEALING_MAX_TOTAL_COMMIT', 0)),
 ):
     """
 
@@ -167,22 +171,34 @@ def auto_shutdown(
         waterhealer.core.Stream object
     got_error: bool, (default=True)
         if dask streaming got an exception, automatically shutdown the script.
+        or set using OS env, `HEALING_GOT_ERROR`.
     got_dask: bool, (default=True)
         if True, will check Dask status, will shutdown if client status not in ('running','closing','connecting','newly-created').
+        or set using OS env, `HEALING_GOT_DASK`.
     graceful_offset: int, (default=3600)
         automatically shutdown the script if water-healer not updated any offsets after `graceful_offset` period.
-        To disable it, set it to 0.
+        to disable it, set it to 0.
+        or set using OS env, `HEALING_GRACEFUL_OFFSET`.
     graceful_polling: int, (default=1800)
         automatically shutdown the script if kafka consumer not polling after `graceful_polling` period.
-        To disable it, set it to 0.
+        to disable it, set it to 0.
+        or set using OS env, `HEALING_GRACEFUL_POLLING`.
     interval: int, (default=5)
         check heartbeat every `interval`.
+        or set using OS env, `HEALING_INTERVAL`.
     sleep_before_shutdown: int, (defaut=2)
         sleep (second) before shutdown.
+        or set using OS env, `HEALING_SLEEP_BEFORE_SHUTDOWN`.
     auto_expired: int, (default=10800)
         auto shutdown after `auto_expired`. Set to `0` to disable it.
         This is to auto restart the python script to flush out memory leaks.
+        or set using OS env, `HEALING_AUTO_EXPIRED`.
+    max_total_commit: int, (default=0)
+        max total kafka commit, set to `0` to disable it.
+        if total commit bigger than `max_total_commit`, it will shutdown the script.
+        or set using OS env, `HEALING_MAX_TOTAL_COMMIT`.
     """
+
     start_time = datetime.now()
 
     def get_client(return_exception=False):
@@ -308,11 +324,16 @@ def auto_shutdown(
         if graceful_polling:
             check_graceful_polling()
 
-        if auto_expired > 0:
-            if (datetime.now() - start_time).seconds > auto_expired:
-                error = 'shutting down caused by expired.'
-                logger.error(error)
-                time.sleep(sleep_before_shutdown)
-                os._exit(1)
+        if auto_expired > 0 and (datetime.now() - start_time).seconds > auto_expired:
+            error = 'shutting down caused by expired.'
+            logger.error(error)
+            time.sleep(sleep_before_shutdown)
+            os._exit(1)
+
+        if max_total_commit > 0 and COMMIT_COUNT > max_total_commit:
+            error = 'shutting down caused by max total commit.'
+            logger.error(error)
+            time.sleep(sleep_before_shutdown)
+            os._exit(1)
 
         time.sleep(interval)

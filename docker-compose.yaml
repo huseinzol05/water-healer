@@ -5,8 +5,6 @@ services:
     image: confluentinc/cp-zookeeper:6.2.0
     hostname: zookeeper
     container_name: zookeeper
-    ports:
-      - "2181:2181"
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
 
@@ -27,7 +25,7 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_NUM_PARTITIONS: 10
+      KAFKA_NUM_PARTITIONS: 2
 
   kowl:
     image: quay.io/cloudhut/kowl:master
@@ -45,6 +43,6 @@ services:
     image: redis:6.2.5-alpine
     container_name: redis
     ports:
-      - "6379:6379"
+      - "6400:6379"
 
 

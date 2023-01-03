@@ -35,11 +35,11 @@ class KafkaOffset:
     ):
         self.db = db
         if self.db is None:
-            self.db = DictHealer(**kwargs)
+            self.db = Database(**kwargs)
             logger.info(
-                f'Use waterhealer.db.expiringdict.DictHealer with max_len={db.maxlen_memory}, max_age_seconds={db.maxage_memory}')
-        else:
-            logger.info(f'Use {db.__module__}.{db.__class__.__name__}')
+                f'`db` is None, use `waterhealer.db.expiringdict.Database` with max_len={self.db.maxlen_memory}, max_age_seconds={self.db.maxage_memory}')
+
+        logger.info(f'Use {self.db.__module__}.{self.db.__class__.__name__}')
 
 
 @Stream.register_api(staticmethod)

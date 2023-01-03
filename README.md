@@ -14,44 +14,6 @@ This library also added streaming metrics, auto-shutdown, auto-graceful, unique 
 <a href="https://github.com/hhatto/autopep8"><img alt="Code style: autopep8" src="https://img.shields.io/badge/code%20style-autopep8-000000.svg"></a>
 </p>
 
-## Table of contents
-
-  * [Problem statement](#Problem-statement)
-    * [update offset during sinking](#update-offset-during-sinking)
-    * [update offset for distributed processing](#update-offset-for-distributed-processing)
-  * [Installing from the PyPI](#Installing-from-the-PyPI)
-  * [How-to](#how-to)
-    * [update offset](#update-offset)
-    * [Provide at-most-once](#provide-at-most-once)
-    * [streaming metrics](#streaming-metrics)
-    * [auto shutdown](#auto-shutdown)
-    * [auto graceful delete](#auto-graceful-delete)
-    * [JSON logging with unique emit ID](#JSON-logging-with-unique-emit-ID)
-    * [Remote logging](#Remote-logging)
-    * [checkpointing](#checkpointing)
-      * [disable checkpointing using OS environment](#disable-checkpointing-using-os-environment)
-    * [check leakage on offsets](#check-leakage-on-offsets)
-  * [API](#API)
-    * [checker](#checker)
-      * [waterhealer.checker.check_leakage](#waterhealercheckercheck_leakage)
-    * [core](#extension)
-      * [waterhealer.core.partition_time](#waterhealercorepartition_time)
-      * [waterhealer.core.foreach_map](#waterhealercoreforeach_map)
-      * [waterhealer.core.foreach_async](#waterhealercoreforeach_async)
-    * [dask_plugin](#dask_plugin)
-      * [waterhealer.dask_plugin.remote_logging](#waterhealerdaskpluginremote_logging)
-    * [healing](#healing)
-      * [waterhealer.healing.healing](#waterhealerhealinghealing)
-      * [waterhealer.healing.auto_shutdown](#waterhealerhealingauto_shutdown)
-    * [kafka](#kafka)
-      * [waterhealer.kafka.from_kafka](#waterhealerkafkafrom_kafka)
-      * [waterhealer.kafka.from_kafka_batched](#waterhealerkafkafrom_kafka_batched)
-      * [waterhealer.kafka.from_kafka_batched_scatter](#waterhealerkafkafrom_kafka_batched_scatter)
-    * [source](#source)
-      * [waterhealer.metrics](#waterhealermetrics)
-  * [Examples](#Examples)
-  * [What is the pain points?](#What-is-the-pain-points)
-
 ## Problem statement
 
 ### update offset during sinking
@@ -871,13 +833,14 @@ Example, [simple-plus-element-kafka.ipynb](example/simple-plus-element-kafka.ipy
 ```python
 def auto_shutdown(
     source,
-    got_error: bool = True,
-    got_dask: bool = True,
-    graceful_offset: int = 3600,
-    graceful_polling: int = 1800,
-    interval: int = 5,
-    sleep_before_shutdown: int = 2,
-    auto_expired: int = 10800,
+    got_error: bool = to_bool(os.environ.get('HEALING_GOT_ERROR', 'true')),
+    got_dask: bool = to_bool(os.environ.get('HEALING_GOT_DASK', 'true')),
+    graceful_offset: int = int(os.environ.get('HEALING_GRACEFUL_OFFSET', 3600)),
+    graceful_polling: int = int(os.environ.get('HEALING_GRACEFUL_POLLING', 1800)),
+    interval: int = int(os.environ.get('HEALING_INTERVAL', 5)),
+    sleep_before_shutdown: int = int(os.environ.get('HEALING_SLEEP_BEFORE_SHUTDOWN', 2)),
+    auto_expired: int = int(os.environ.get('HEALING_AUTO_EXPIRED', 10800)),
+    max_total_commit: int = int(os.environ.get('HEALING_MAX_TOTAL_COMMIT', 0)),
 ):
     """
 
@@ -887,21 +850,32 @@ def auto_shutdown(
         waterhealer.core.Stream object
     got_error: bool, (default=True)
         if dask streaming got an exception, automatically shutdown the script.
+        or set using OS env, `HEALING_GOT_ERROR`.
     got_dask: bool, (default=True)
         if True, will check Dask status, will shutdown if client status not in ('running','closing','connecting','newly-created').
+        or set using OS env, `HEALING_GOT_DASK`.
     graceful_offset: int, (default=3600)
         automatically shutdown the script if water-healer not updated any offsets after `graceful_offset` period.
-        To disable it, set it to 0.
+        to disable it, set it to 0.
+        or set using OS env, `HEALING_GRACEFUL_OFFSET`.
     graceful_polling: int, (default=1800)
         automatically shutdown the script if kafka consumer not polling after `graceful_polling` period.
-        To disable it, set it to 0.
+        to disable it, set it to 0.
+        or set using OS env, `HEALING_GRACEFUL_POLLING`.
     interval: int, (default=5)
         check heartbeat every `interval`.
+        or set using OS env, `HEALING_INTERVAL`.
     sleep_before_shutdown: int, (defaut=2)
         sleep (second) before shutdown.
+        or set using OS env, `HEALING_SLEEP_BEFORE_SHUTDOWN`.
     auto_expired: int, (default=10800)
         auto shutdown after `auto_expired`. Set to `0` to disable it.
         This is to auto restart the python script to flush out memory leaks.
+        or set using OS env, `HEALING_AUTO_EXPIRED`.
+    max_total_commit: int, (default=0)
+        max total kafka commit, set to `0` to disable it.
+        if total commit bigger than `max_total_commit`, it will shutdown the script.
+        or set using OS env, `HEALING_MAX_TOTAL_COMMIT`.
     """
 ```
 

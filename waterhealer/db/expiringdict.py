@@ -16,11 +16,16 @@ MAXAGE_MEMORY = int(os.environ.get('MAXAGE_MEMORY', 3600))
 
 
 class ExpiringDict(OrderedDict):
-    def __init__(self, max_len: int, max_age_seconds: int,
-                 items=None,
-                 auto_refresh: bool = False,
-                 auto_expired: bool = True,
-                 expired_sleep: float = 0.1, **kwargs):
+    def __init__(
+        self,
+        max_len: int,
+        max_age_seconds: int,
+        items=None,
+        auto_refresh: bool = False,
+        auto_expired: bool = True,
+        expired_sleep: float = 0.1,
+        **kwargs,
+    ):
 
         if not self.__is_instance_of_expiring_dict(items):
             self.__assertions(max_len, max_age_seconds)
@@ -277,9 +282,12 @@ class ExpiringDict(OrderedDict):
 
 
 class Database:
-    def __init__(self, maxlen_memory: int = MAXLEN_MEMORY,
-                 maxage_memory: int = MAXAGE_MEMORY,
-                 **kwargs):
+    def __init__(
+        self,
+        maxlen_memory: int = MAXLEN_MEMORY,
+        maxage_memory: int = MAXAGE_MEMORY,
+        **kwargs,
+    ):
         """
         Parameters
         ----------
