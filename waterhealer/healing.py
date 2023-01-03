@@ -324,16 +324,16 @@ def auto_shutdown(
         if graceful_polling:
             check_graceful_polling()
 
-        if auto_expired > 0 and (datetime.now() - start_time).seconds > auto_expired:
-            error = 'shutting down caused by expired.'
-            logger.error(error)
+        if auto_expired > 0 and (datetime.now() - start_time).seconds >= auto_expired:
+            info = 'shutting down caused by expired.'
+            logger.info(info)
             time.sleep(sleep_before_shutdown)
-            os._exit(1)
+            os._exit(0)
 
-        if max_total_commit > 0 and COMMIT_COUNT > max_total_commit:
-            error = 'shutting down caused by max total commit.'
-            logger.error(error)
+        if max_total_commit > 0 and COMMIT_COUNT >= max_total_commit:
+            info = 'shutting down caused by max total commit.'
+            logger.info(info)
             time.sleep(sleep_before_shutdown)
-            os._exit(1)
+            os._exit(0)
 
         time.sleep(interval)

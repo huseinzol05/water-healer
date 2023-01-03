@@ -251,6 +251,7 @@ class Stream(object):
         asynchronous=None,
         ensure_io_loop=False,
         checkpoint=False,
+        **kwargs,
     ):
         self.downstreams = OrderedWeakrefSet()
         if upstreams is not None:
