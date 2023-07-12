@@ -209,7 +209,7 @@ def auto_shutdown(
             client = default_client()
         except Exception as e:
             error = str(e)
-            logger.error(e)
+            logger.warning(e)
             client = None
 
         if return_exception:
