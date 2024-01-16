@@ -166,11 +166,11 @@ We need to use `waterhealer.from_kafka` for streaming source, and use `waterheal
 
 Simply can read more about [waterhealer.kafka.from_kafka](#waterhealerkafkafrom_kafka) and [waterhealer.healing.healing](#waterhealerhealinghealing)
 
-### Provide at-most-once
+### Provide at-least-once
 
-To ensure at-most-once processed for Kafka consumers, we have to introduce distributed messaging among consumers about failed and successed events so new consumers that joined in the same consumer group will not pulled the same successful events but not yet committed in Kafka offsets.
+To ensure at-least-once processed for Kafka consumers, we have to introduce distributed messaging among consumers about failed and successed events so new consumers that joined in the same consumer group will not pulled the same successful events but not yet committed in Kafka offsets.
 
-We can use any persistent database to validate the offsets, we provided `waterhealer.db.redis.Database` for faster and easier interface to use redis in water-healer. To provide at-most-once,
+We can use any persistent database to validate the offsets, we provided `waterhealer.db.redis.Database` for faster and easier interface to use redis in water-healer. To provide at-least-once,
 
 ```python
 import waterhealer as wh
